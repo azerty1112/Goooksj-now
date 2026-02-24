@@ -349,6 +349,7 @@ if ($slug === '' && $staticPage === '') {
             position: relative;
             text-rendering: optimizeLegibility;
             -webkit-font-smoothing: antialiased;
+            overflow-x: hidden;
         }
 
         body::before,
@@ -456,6 +457,8 @@ if ($slug === '' && $staticPage === '') {
             grid-template-columns: minmax(220px, 1.4fr) repeat(5, minmax(120px, 1fr)) auto;
             gap: 0.6rem;
             align-items: center;
+            content-visibility: auto;
+            contain-intrinsic-size: 120px;
         }
 
         .toolbar-form .form-control,
@@ -541,6 +544,7 @@ if ($slug === '' && $staticPage === '') {
 
         .article-content img {
             max-width: 100%;
+            height: auto;
             border-radius: 0.7rem;
             box-shadow: 0 12px 30px rgba(15, 23, 42, 0.18);
             margin-block: 0.9rem;
@@ -759,6 +763,10 @@ if ($slug === '' && $staticPage === '') {
         }
 
         @media (max-width: 767px) {
+            :root {
+                --app-bg: #fff7ed;
+            }
+
             body::before,
             body::after {
                 display: none;
@@ -785,6 +793,34 @@ if ($slug === '' && $staticPage === '') {
             .toolbar-form {
                 grid-template-columns: 1fr auto;
                 padding: 0.5rem;
+                gap: 0.45rem;
+            }
+
+            .container {
+                padding-left: 0.75rem;
+                padding-right: 0.75rem;
+            }
+
+            .hero-subtitle {
+                font-size: 0.95rem;
+            }
+
+            .card-title {
+                font-size: 1rem;
+                line-height: 1.35;
+            }
+
+            .card-text,
+            .meta-pill {
+                font-size: 0.82rem;
+            }
+
+            .featured-spotlight {
+                padding: 1rem !important;
+            }
+
+            .results-header {
+                align-items: flex-start;
                 gap: 0.45rem;
             }
 
@@ -823,9 +859,9 @@ if ($slug === '' && $staticPage === '') {
     <div class="container flex-wrap gap-2 py-2">
         <a class="navbar-brand" href="index.php"><?= e($siteTitle) ?></a>
         <div class="d-flex gap-2 flex-wrap">
-            <a href="index.php?doc=about" class="btn btn-sm btn-outline-light">About</a>
-            <a href="index.php?doc=privacy" class="btn btn-sm btn-outline-light">Privacy</a>
-            <a href="index.php?doc=contact" class="btn btn-sm btn-outline-light">Contact</a>
+            <a href="about.htl" class="btn btn-sm btn-outline-light">About</a>
+            <a href="privercy.html" class="btn btn-sm btn-outline-light">Privacy</a>
+            <a href="contact.html" class="btn btn-sm btn-outline-light">Contact</a>
         </div>
     </div>
 </nav>
@@ -1113,7 +1149,7 @@ $baseQuery['per_page'] = $perPage;
         <div class="alert alert-info">No articles found<?= $search !== '' ? ' for "' . e($search) . '"' : '' ?>.</div>
     <?php elseif ($view === 'list'): ?>
         <div class="list-group shadow-sm">
-            <?php foreach ($articles as $row): ?>
+            <?php foreach ($articles as $index => $row): ?>
                 <?php $articleQuery = array_merge($baseQuery, ['slug' => $row['slug']]); ?>
                 <a href="?<?= e(http_build_query($articleQuery)) ?>" class="list-group-item list-group-item-action py-3">
                     <div class="d-flex w-100 justify-content-between">
@@ -1131,11 +1167,11 @@ $baseQuery['per_page'] = $perPage;
             <span class="meta-pill">Page <?= $page ?> / <?= $totalPages ?></span>
         </div>
         <div class="row row-cols-1 row-cols-md-3 g-4">
-            <?php foreach ($articles as $row): ?>
+            <?php foreach ($articles as $index => $row): ?>
                 <?php $cardImage = trim((string)($row['image'] ?? '')) !== '' ? $row['image'] : buildFreeArticleImageUrl($row['title'] ?? $row['slug']); ?>
                 <div class="col">
                     <div class="card h-100 shadow-sm">
-                        <img src="<?= e($cardImage) ?>" class="card-img-top" style="height:200px;object-fit:cover" alt="<?= e(buildImageSeoText($row['title'] ?? '', $row['slug'] ?? '', $imageAltSuffix)) ?>" title="<?= e(buildImageSeoText($row['title'] ?? '', $row['slug'] ?? '', $imageTitleSuffix)) ?>" loading="lazy" decoding="async">
+                        <img src="<?= e($cardImage) ?>" class="card-img-top" style="height:200px;object-fit:cover" alt="<?= e(buildImageSeoText($row['title'] ?? '', $row['slug'] ?? '', $imageAltSuffix)) ?>" title="<?= e(buildImageSeoText($row['title'] ?? '', $row['slug'] ?? '', $imageTitleSuffix)) ?>" loading="<?= $index === 0 ? 'eager' : 'lazy' ?>" fetchpriority="<?= $index === 0 ? 'high' : 'low' ?>" decoding="async">
                         <div class="card-body d-flex flex-column">
                             <h3 class="card-title h5 mb-0"><?= e($row['title']) ?></h3>
                             <p class="card-text text-muted"><?= e($row['excerpt']) ?></p>
@@ -1188,10 +1224,10 @@ $baseQuery['per_page'] = $perPage;
 <footer class="app-footer">
     Designed for car enthusiasts • <?= gmdate('Y') ?>
     <div class="footer-links">
-        <a href="index.php?doc=about">About</a>
-        <a href="index.php?doc=privacy">Privacy Policy</a>
-        <a href="index.php?doc=terms">Terms</a>
-        <a href="index.php?doc=contact">Contact</a>
+        <a href="about.htl">About</a>
+        <a href="privercy.html">Privacy Policy</a>
+        <a href="terms.html">Terms</a>
+        <a href="contact.html">Contact</a>
     </div>
 </footer>
 </div>
