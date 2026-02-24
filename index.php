@@ -819,6 +819,28 @@ if ($slug === '' && $staticPage === '') {
                 padding: 1rem !important;
             }
 
+            .mobile-hide {
+                display: none !important;
+            }
+
+            .stats-row {
+                --bs-gutter-x: 0.5rem;
+            }
+
+            .stats-row .stats-card {
+                padding: 0.7rem !important;
+                text-align: center;
+            }
+
+            .stats-row .stats-card small {
+                font-size: 0.72rem;
+                line-height: 1.25;
+            }
+
+            .stats-row .stats-card .fs-4 {
+                font-size: 1.08rem !important;
+            }
+
             .results-header {
                 align-items: flex-start;
                 gap: 0.45rem;
@@ -1123,16 +1145,16 @@ $baseQuery['per_page'] = $perPage;
     }
     ?>
 
-    <section class="mb-4 p-4 rounded-4 featured-spotlight text-white" style="background:linear-gradient(130deg,#0f172a,#1d4ed8 58%,#f97316);">
+    <section class="mb-4 p-4 rounded-4 featured-spotlight text-white mobile-hide" style="background:linear-gradient(130deg,#0f172a,#1d4ed8 58%,#f97316);">
         <small class="text-uppercase">New look</small>
         <h1 class="h3 mt-2 mb-2">Discover <span class="hero-highlight">colorful</span> automotive insights</h1>
         <p class="hero-subtitle mb-0">Browse curated reviews, practical maintenance advice, and buying tips with cleaner cards and improved article readability.</p>
     </section>
 
-    <div class="row g-3 mb-4">
-        <div class="col-md-4"><div class="stats-card p-3"><small class="text-muted d-block">Total articles</small><strong class="fs-4"><?= $totalArticles ?></strong></div></div>
-        <div class="col-md-4"><div class="stats-card p-3"><small class="text-muted d-block">Filtered results</small><strong class="fs-4"><?= $total ?></strong></div></div>
-        <div class="col-md-4"><div class="stats-card p-3"><small class="text-muted d-block">Avg read time (page)</small><strong class="fs-4"><?= $avgReading ?> min</strong></div></div>
+    <div class="row stats-row g-3 mb-4">
+        <div class="col-4 col-md-4"><div class="stats-card p-3"><small class="text-muted d-block">Total articles</small><strong class="fs-4"><?= $totalArticles ?></strong></div></div>
+        <div class="col-4 col-md-4"><div class="stats-card p-3"><small class="text-muted d-block">Filtered results</small><strong class="fs-4"><?= $total ?></strong></div></div>
+        <div class="col-4 col-md-4"><div class="stats-card p-3"><small class="text-muted d-block">Avg read time (page)</small><strong class="fs-4"><?= $avgReading ?> min</strong></div></div>
     </div>
 
     <?php if ($featured): ?>
