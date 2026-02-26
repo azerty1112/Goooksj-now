@@ -129,6 +129,19 @@ $metaPixelId = trim((string)getSetting('meta_pixel_id', ''));
 $customHeadScripts = trim((string)getSetting('custom_head_scripts', ''));
 $customBodyScripts = trim((string)getSetting('custom_body_scripts', ''));
 
+function renderCustomScripts($scripts) {
+    $scripts = trim((string)$scripts);
+    if ($scripts === '') {
+        return '';
+    }
+
+    if (stripos($scripts, '<script') !== false) {
+        return $scripts;
+    }
+
+    return '<script>' . PHP_EOL . $scripts . PHP_EOL . '</script>';
+}
+
 
 function getPublicCategoryLabel($category) {
     $category = trim((string)$category);
@@ -377,7 +390,7 @@ if ($slug === '' && $staticPage === '') {
         </script>
     <?php endif; ?>
     <?php if ($customHeadScripts !== ''): ?>
-        <?= $customHeadScripts ?>
+        <?= renderCustomScripts($customHeadScripts) ?>
     <?php endif; ?>
     <style>
         :root {
@@ -1304,7 +1317,7 @@ $baseQuery['per_page'] = $perPage;
     <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=<?= e($googleTagManagerId) ?>" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
 <?php endif; ?>
 <?php if ($customBodyScripts !== ''): ?>
-    <?= $customBodyScripts ?>
+    <?= renderCustomScripts($customBodyScripts) ?>
 <?php endif; ?>
 </body>
 </html>
