@@ -16,6 +16,22 @@ function e($text) {
     return htmlspecialchars((string)$text, ENT_QUOTES, 'UTF-8');
 }
 
+function detectPreferredLanguage() {
+    $queryLang = strtolower(trim((string)($_GET['lang'] ?? '')));
+    if (in_array($queryLang, ['ar', 'en'], true)) {
+        return $queryLang;
+    }
+
+    $countryCode = strtoupper(trim((string)($_SERVER['HTTP_CF_IPCOUNTRY'] ?? $_SERVER['GEOIP_COUNTRY_CODE'] ?? '')));
+    $arabicCountries = ['SA', 'AE', 'EG', 'KW', 'QA', 'BH', 'OM', 'JO', 'LB', 'SY', 'IQ', 'YE', 'MA', 'DZ', 'TN', 'LY', 'SD', 'PS', 'MR', 'SO', 'DJ', 'KM'];
+    if ($countryCode !== '') {
+        return in_array($countryCode, $arabicCountries, true) ? 'ar' : 'en';
+    }
+
+    $acceptLanguage = strtolower((string)($_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? ''));
+    return str_starts_with($acceptLanguage, 'ar') ? 'ar' : 'en';
+}
+
 
 function getSiteTitle() {
     $configuredTitle = trim((string)getSetting('site_title', SITE_TITLE));
