@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="description" content="تواصل معنا بسهولة.">
+  <meta name="description" content="تواصل معنا بشأن الملاحظات، البلاغات، وفرص التعاون.">
   <title>تواصل معنا</title>
   <style>
     body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#fff7ed;color:#1f2937;line-height:1.8}
@@ -11,16 +11,41 @@
     .card{background:#fff;border:1px solid #fed7aa;border-radius:14px;padding:16px;box-shadow:0 4px 14px rgba(0,0,0,.06)}
     .mail{font-weight:700;word-break:break-word}
     a{color:#c2410c;text-decoration:none}
+    .small{font-size:.95rem;color:#4b5563}
   </style>
 </head>
 <body>
   <main class="wrap">
     <section class="card">
       <h1>تواصل معنا</h1>
-      <p>لأي استفسار أو ملاحظة:</p>
-      <p class="mail">contact@example.com</p>
+      <p>لأي استفسار حول المحتوى، الإعلانات، أو حقوق الاستخدام، راسلنا عبر البريد:</p>
+      <p class="mail">contact@xf9.store</p>
+      <p class="small">نحاول الرد خلال يومي عمل.</p>
       <p><a href="index.php">العودة للرئيسية</a></p>
     </section>
   </main>
+
+  <!-- International cookie consent script (GDPR/CCPA ready) -->
+  <script defer src="https://cdn.jsdelivr.net/npm/cookieconsent@3/build/cookieconsent.min.js"></script>
+  <script>
+    window.addEventListener('load', function () {
+      if (window.cookieconsent) {
+        window.cookieconsent.initialise({
+          palette: {
+            popup: { background: '#1f2937' },
+            button: { background: '#f59e0b' }
+          },
+          theme: 'classic',
+          position: 'bottom',
+          content: {
+            message: 'نستخدم ملفات تعريف الارتباط لتحسين التجربة وعرض إعلانات ملائمة دوليًا.',
+            dismiss: 'موافق',
+            link: 'سياسة الخصوصية',
+            href: 'privercy.html'
+          }
+        });
+      }
+    });
+  </script>
 </body>
 </html>
