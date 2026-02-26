@@ -4,6 +4,16 @@ require_once 'functions.php';
 $pdo = db_connect();
 $slug = trim($_GET['slug'] ?? '');
 $staticPage = trim((string)($_GET['doc'] ?? ''));
+$language = detectPreferredLanguage();
+$isArabic = $language === 'ar';
+$layoutDirection = $isArabic ? 'rtl' : 'ltr';
+$uiText = [
+    'about' => $isArabic ? 'من نحن' : 'About',
+    'privacy' => $isArabic ? 'سياسة الخصوصية' : 'Privacy Policy',
+    'terms' => $isArabic ? 'الشروط' : 'Terms',
+    'contact' => $isArabic ? 'تواصل معنا' : 'Contact Us',
+    'designed_for' => $isArabic ? 'مصمم لعشاق السيارات' : 'Designed for car enthusiasts',
+];
 $baseUrl = getSiteBaseUrl();
 $siteTitle = getSiteTitle();
 $pageTitle = (string)getSetting('seo_home_title', $siteTitle);
@@ -16,40 +26,72 @@ $breadcrumbStructuredData = null;
 $listingStructuredData = null;
 $staticPages = [
     'about' => [
-        'title' => 'About Us',
-        'description' => 'Learn more about our automotive editorial mission, publishing standards, and audience-first approach.',
-        'content' => [
-            'We publish practical automotive content focused on real ownership questions: maintenance, buying, safety, and long-term value.',
-            'Our editorial workflow combines automated research with final quality checks for readability, originality, and user usefulness.',
-            'We prioritize clear language, transparent labeling, and content that helps readers make better car decisions.',
-        ],
+        'title' => $isArabic ? 'من نحن' : 'About Us',
+        'description' => $isArabic
+            ? 'تعرف على رسالتنا التحريرية في مجال السيارات ومعايير النشر التي نعتمدها.'
+            : 'Learn more about our automotive editorial mission, publishing standards, and audience-first approach.',
+        'content' => $isArabic
+            ? [
+                'ننشر محتوى عمليًا عن السيارات يركز على أسئلة المالك الحقيقية مثل الصيانة والشراء والسلامة.',
+                'نجمع بين الأتمتة والمراجعة البشرية لضمان جودة المحتوى وسهولة القراءة.',
+                'نلتزم بالوضوح والشفافية لمساعدة القرّاء على اتخاذ قرارات أفضل.',
+            ]
+            : [
+                'We publish practical automotive content focused on real ownership questions: maintenance, buying, safety, and long-term value.',
+                'Our editorial workflow combines automated research with final quality checks for readability, originality, and user usefulness.',
+                'We prioritize clear language, transparent labeling, and content that helps readers make better car decisions.',
+            ],
     ],
     'contact' => [
-        'title' => 'Contact Us',
-        'description' => 'Need support, want to report an issue, or discuss collaboration? Reach our editorial and support team.',
-        'content' => [
-            'For support and editorial requests, please email: contact@example.com',
-            'For ad and business inquiries, please email: partnerships@example.com',
-            'We review all messages and aim to reply within 2 business days.',
-        ],
+        'title' => $isArabic ? 'تواصل معنا' : 'Contact Us',
+        'description' => $isArabic
+            ? 'هل تحتاج دعمًا أو ترغب في التعاون؟ تواصل مع فريق التحرير والدعم.'
+            : 'Need support, want to report an issue, or discuss collaboration? Reach our editorial and support team.',
+        'content' => $isArabic
+            ? [
+                'لدعم الموقع وطلبات التحرير: contact@example.com',
+                'للشراكات والإعلانات: partnerships@example.com',
+                'نراجع جميع الرسائل ونحاول الرد خلال يومي عمل.',
+            ]
+            : [
+                'For support and editorial requests, please email: contact@example.com',
+                'For ad and business inquiries, please email: partnerships@example.com',
+                'We review all messages and aim to reply within 2 business days.',
+            ],
     ],
     'privacy' => [
-        'title' => 'Privacy Policy',
-        'description' => 'Read how we collect, use, and protect visitor data, cookies, and analytics information.',
-        'content' => [
-            'We may use analytics and advertising technologies (such as cookies and measurement scripts) to understand traffic and improve user experience.',
-            'We do not intentionally collect sensitive personal information through public pages. If you contact us directly, we only use your information to respond.',
-            'Third-party services (including ad providers) may process data according to their own privacy policies. You can disable cookies from your browser settings.',
-        ],
+        'title' => $isArabic ? 'سياسة الخصوصية' : 'Privacy Policy',
+        'description' => $isArabic
+            ? 'اعرف كيف نجمع ونستخدم ونحمي بيانات الزوار وملفات تعريف الارتباط.'
+            : 'Read how we collect, use, and protect visitor data, cookies, and analytics information.',
+        'content' => $isArabic
+            ? [
+                'قد نستخدم التحليلات وتقنيات الإعلانات (مثل الكوكيز) لفهم الزيارات وتحسين التجربة.',
+                'لا نجمع عمدًا بيانات شخصية حساسة عبر الصفحات العامة، ونستخدم بيانات التواصل للرد فقط.',
+                'قد تعالج خدمات الطرف الثالث البيانات وفق سياساتها الخاصة، ويمكنك تعطيل الكوكيز من إعدادات المتصفح.',
+            ]
+            : [
+                'We may use analytics and advertising technologies (such as cookies and measurement scripts) to understand traffic and improve user experience.',
+                'We do not intentionally collect sensitive personal information through public pages. If you contact us directly, we only use your information to respond.',
+                'Third-party services (including ad providers) may process data according to their own privacy policies. You can disable cookies from your browser settings.',
+            ],
     ],
     'terms' => [
-        'title' => 'Terms of Use',
-        'description' => 'Website terms covering acceptable use, intellectual property, disclaimers, and content usage.',
-        'content' => [
-            'By using this website, you agree to use the content for lawful and personal informational purposes only.',
-            'All articles are provided for general information and do not replace professional legal, financial, or mechanical advice.',
-            'We may update content and site policies at any time to maintain quality, compliance, and platform requirements.',
-        ],
+        'title' => $isArabic ? 'الشروط والأحكام' : 'Terms of Use',
+        'description' => $isArabic
+            ? 'شروط الاستخدام التي تغطي الاستخدام المقبول وحقوق الملكية والتنبيهات القانونية.'
+            : 'Website terms covering acceptable use, intellectual property, disclaimers, and content usage.',
+        'content' => $isArabic
+            ? [
+                'باستخدامك للموقع فإنك توافق على استخدام المحتوى لأغراض قانونية ومعلوماتية شخصية فقط.',
+                'جميع المقالات لأغراض معرفية عامة ولا تُعد بديلاً عن الاستشارات المهنية.',
+                'قد نقوم بتحديث المحتوى والسياسات في أي وقت لضمان الجودة والامتثال.',
+            ]
+            : [
+                'By using this website, you agree to use the content for lawful and personal informational purposes only.',
+                'All articles are provided for general information and do not replace professional legal, financial, or mechanical advice.',
+                'We may update content and site policies at any time to maintain quality, compliance, and platform requirements.',
+            ],
     ],
 ];
 
@@ -230,7 +272,7 @@ if ($slug === '' && $staticPage === '') {
 }
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="<?= e($language) ?>" dir="<?= e($layoutDirection) ?>">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -244,6 +286,9 @@ if ($slug === '' && $staticPage === '') {
         <meta name="msvalidate.01" content="<?= e($bingSiteVerification) ?>">
     <?php endif; ?>
     <link rel="canonical" href="<?= e($canonicalUrl) ?>">
+    <link rel="alternate" hreflang="en" href="<?= e($canonicalUrl . (str_contains($canonicalUrl, '?') ? '&' : '?') . 'lang=en') ?>">
+    <link rel="alternate" hreflang="ar" href="<?= e($canonicalUrl . (str_contains($canonicalUrl, '?') ? '&' : '?') . 'lang=ar') ?>">
+    <link rel="alternate" hreflang="x-default" href="<?= e($canonicalUrl . (str_contains($canonicalUrl, '?') ? '&' : '?') . 'lang=en') ?>">
     <meta property="og:title" content="<?= e($pageTitle) ?>">
     <meta property="og:description" content="<?= e($pageDescription) ?>">
     <meta property="og:type" content="<?= e($openGraphType) ?>">
@@ -881,9 +926,10 @@ if ($slug === '' && $staticPage === '') {
     <div class="container flex-wrap gap-2 py-2">
         <a class="navbar-brand" href="index.php"><?= e($siteTitle) ?></a>
         <div class="d-flex gap-2 flex-wrap">
-            <a href="about.htl" class="btn btn-sm btn-outline-light">About</a>
-            <a href="privercy.html" class="btn btn-sm btn-outline-light">Privacy</a>
-            <a href="contact.html" class="btn btn-sm btn-outline-light">Contact</a>
+            <a href="index.php?doc=about&amp;lang=<?= e($language) ?>" class="btn btn-sm btn-outline-light"><?= e($uiText['about']) ?></a>
+            <a href="index.php?doc=privacy&amp;lang=<?= e($language) ?>" class="btn btn-sm btn-outline-light"><?= e($uiText['privacy']) ?></a>
+            <a href="index.php?doc=terms&amp;lang=<?= e($language) ?>" class="btn btn-sm btn-outline-light"><?= e($uiText['terms']) ?></a>
+            <a href="index.php?doc=contact&amp;lang=<?= e($language) ?>" class="btn btn-sm btn-outline-light"><?= e($uiText['contact']) ?></a>
         </div>
     </div>
 </nav>
@@ -1244,12 +1290,12 @@ $baseQuery['per_page'] = $perPage;
 <?php endif; ?>
 
 <footer class="app-footer">
-    Designed for car enthusiasts • <?= gmdate('Y') ?>
+    <?= e($uiText['designed_for']) ?> • <?= gmdate('Y') ?>
     <div class="footer-links">
-        <a href="about.htl">About</a>
-        <a href="privercy.html">Privacy Policy</a>
-        <a href="terms.html">Terms</a>
-        <a href="contact.html">Contact</a>
+        <a href="index.php?doc=about&amp;lang=<?= e($language) ?>"><?= e($uiText['about']) ?></a>
+        <a href="index.php?doc=privacy&amp;lang=<?= e($language) ?>"><?= e($uiText['privacy']) ?></a>
+        <a href="index.php?doc=terms&amp;lang=<?= e($language) ?>"><?= e($uiText['terms']) ?></a>
+        <a href="index.php?doc=contact&amp;lang=<?= e($language) ?>"><?= e($uiText['contact']) ?></a>
     </div>
 </footer>
 </div>

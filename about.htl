@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="ar" dir="rtl">
+<html lang="en" dir="ltr">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="description" content="تعرف علينا وعلى مهمة الموقع ومعايير النشر.">
-  <title>من نحن</title>
+  <meta name="description" content="Learn about our mission and publishing standards.">
+  <title>About Us</title>
   <style>
     body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#fff7ed;color:#1f2937;line-height:1.8}
     .wrap{max-width:760px;margin:auto;padding:16px}
@@ -15,15 +15,14 @@
 <body>
   <main class="wrap">
     <section class="card">
-      <h1>من نحن</h1>
-      <p>نحن منصة محتوى تهدف لتقديم معلومات واضحة ومفيدة للزوار بجودة عالية.</p>
-      <p>نلتزم بمراجعة المحتوى بشكل دوري وتحسين دقته وتجربة القراءة على جميع الأجهزة.</p>
-      <p>نلتزم أيضًا بالشفافية في ما يتعلق بالإعلانات واستخدام ملفات تعريف الارتباط.</p>
-      <p><a href="index.php">العودة للرئيسية</a></p>
+      <h1>About Us</h1>
+      <p>We are a content platform focused on delivering clear, useful, and high-quality information to visitors.</p>
+      <p>We regularly review content to improve accuracy and readability across all devices.</p>
+      <p>We are also committed to transparency in advertising and cookie usage.</p>
+      <p><a href="index.php">Back to home</a></p>
     </section>
   </main>
 
-  <!-- International cookie consent script (GDPR/CCPA ready) -->
   <script defer src="https://cdn.jsdelivr.net/npm/cookieconsent@3/build/cookieconsent.min.js"></script>
   <script>
     window.addEventListener('load', function () {
@@ -36,9 +35,9 @@
           theme: 'classic',
           position: 'bottom',
           content: {
-            message: 'نعتمد إشعار موافقة الكوكيز وفق المتطلبات الدولية للخصوصية والإعلانات.',
-            dismiss: 'موافق',
-            link: 'سياسة الخصوصية',
+            message: 'This website uses an international cookie consent notice to meet global privacy and advertising requirements.',
+            dismiss: 'Accept',
+            link: 'Privacy Policy',
             href: 'privercy.html'
           }
         });
