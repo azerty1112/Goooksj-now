@@ -38,6 +38,8 @@ $meta = getAutoPublishSchedulerMeta();
 pingSearchEngines(getSiteBaseUrl() . '/sitemap.php');
 // ensure robots.txt is up to date with base URL
 updateRobotsTxt();
+// regenerate standalone static HTML pages
+exportStaticPages();
 
 echo json_encode([
     'ok' => true,

@@ -219,6 +219,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         setSetting('auto_translate_enabled', (string)$autoTranslateEnabled);
         setSetting('auto_translate_target_language', $autoTranslateTarget);
 
+        // regenerate static pages when SEO metadata changes
+        exportStaticPages();
+
         $_SESSION['flash_message'] = 'SEO settings updated successfully.';
         $_SESSION['flash_type'] = 'success';
         header('Location: admin.php');

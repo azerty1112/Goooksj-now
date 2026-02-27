@@ -138,6 +138,8 @@ Generated articles now include:
 
 The project now includes:
 - `sitemap.php` to generate a dynamic XML sitemap for homepage + all articles. The system now automatically pings Google and Bing when new content is added or cron runs.
+- Each article is saved as a standalone HTML page (in `data/exports/slug.html`) containing full metadata, making it easier to serve static copies for SEO.
+- Core informational pages (about, privacy, contact, terms) are automatically exported as independent HTML files at the site root (e.g. `about.html`). These are regenerated during cron runs or when SEO settings change.
 - `robots.txt` with sitemap hint for crawlers; dynamically regenerated to match your base URL.
 - Admin fields for Google Search Console and Bing verification meta tags.
 
@@ -145,5 +147,11 @@ Submit this sitemap in both consoles:
 
 ```
 https://your-domain.com/sitemap.php
+```
+
+To create static copies of the informational pages, run the included exporter script. It will write `about.html`, `contact.html`, `privacy.html`, `terms.html` (and legacy `about-us.html`/`contact-us.html`, `privercy.html`):
+
+```bash
+php scripts/export_static.php
 ```
 
