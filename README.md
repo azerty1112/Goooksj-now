@@ -23,6 +23,15 @@ Simple PHP automotive blog generator with:
 - Multi-format persistence for each article (DB + exported HTML + exported JSON in `data/exports/`).
 - Free automatic article cover images powered by seeded Picsum URLs (no API key required).
 - Anti-duplication guardrails for titles, content, and image URLs to reduce repeated posts.
+  
+### New features (2026 updates)
+* **Secondary cover image** support – articles can now store a second image and fall back gracefully in listings or page markup.
+* **Automatic tagging** – the system scans titles/content and assigns a handful of relevant tags to each new article.
+* **Auto translation** – articles can be translated to a target language (default `ar`) via a simple API; settings live in the Admin SEO panel.
+* **Improved admin analytics** – added search/filter for page visit reports and reorganised SEO/translation controls.
+* **SEO enhancements** – multiple OG images, language-aware titles, and better meta generation across the site.
+* **Auto-indexing (Google/Bing)** – the system now pings search engines whenever the sitemap changes and cron runs, and maintains an accurate `robots.txt` automatically.
+* **Misc** – migration logic now adds new columns (`image2`, `translated_*`, `orig_language`); export tools include new fields.
 
 ## Production pipeline (10 steps)
 
@@ -128,8 +137,8 @@ Generated articles now include:
 ### Search indexing setup (Google + Bing)
 
 The project now includes:
-- `sitemap.php` to generate a dynamic XML sitemap for homepage + all articles.
-- `robots.txt` with sitemap hint for crawlers.
+- `sitemap.php` to generate a dynamic XML sitemap for homepage + all articles. The system now automatically pings Google and Bing when new content is added or cron runs.
+- `robots.txt` with sitemap hint for crawlers; dynamically regenerated to match your base URL.
 - Admin fields for Google Search Console and Bing verification meta tags.
 
 Submit this sitemap in both consoles:

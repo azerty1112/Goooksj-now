@@ -34,6 +34,11 @@ $selectedWorkflow = getSelectedContentWorkflow();
 $schedulerResult = publishAutoArticleBySchedule();
 $meta = getAutoPublishSchedulerMeta();
 
+// ping search engines after cron tasks; sitemap may have new items
+pingSearchEngines(getSiteBaseUrl() . '/sitemap.php');
+// ensure robots.txt is up to date with base URL
+updateRobotsTxt();
+
 echo json_encode([
     'ok' => true,
     'timestamp' => date('c'),

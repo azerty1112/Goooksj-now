@@ -210,7 +210,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         setSetting('seo_auto_link_auto_internal', (string)$seoAutoLinkAutoInternal);
         setSetting('seo_auto_link_max_per_article', (string)$seoAutoLinkMaxPerArticle);
 
+        // translation settings
+        $autoTranslateEnabled = isset($_POST['auto_translate_enabled']) ? 1 : 0;
+        $autoTranslateTarget = trim((string)($_POST['auto_translate_target_language'] ?? ''));
+        if (mb_strlen($autoTranslateTarget) > 5) {
+            $autoTranslateTarget = mb_substr($autoTranslateTarget, 0, 5);
+        }
+        setSetting('auto_translate_enabled', (string)$autoTranslateEnabled);
+        setSetting('auto_translate_target_language', $autoTranslateTarget);
+
         $_SESSION['flash_message'] = 'SEO settings updated successfully.';
+        $_SESSION['flash_type'] = 'success';
+        header('Location: admin.php');
+        exit;
+    }
+
+    if (isset($_POST['ping_sitemap'])) {
+        $sitemap = getSiteBaseUrl() . '/sitemap.php';
+        pingSearchEngines($sitemap);
+        updateRobotsTxt();
+        $_SESSION['flash_message'] = 'Search engines notified (sitemap pinged).';
         $_SESSION['flash_type'] = 'success';
         header('Location: admin.php');
         exit;
@@ -254,6 +273,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         setSetting('meta_pixel_id', $metaPixelId);
         setSetting('custom_head_scripts', $customHeadScripts);
         setSetting('custom_body_scripts', $customBodyScripts);
+        // optional ads.txt content (also persisted to file)
+        $adsTxtContent = trim((string)($_POST['ads_txt_content'] ?? ''));
+        if (mb_strlen($adsTxtContent) > 100000) {
+            $adsTxtContent = mb_substr($adsTxtContent, 0, 100000);
+        }
+        setSetting('ads_txt', $adsTxtContent);
+        @file_put_contents(__DIR__ . '/ads.txt', $adsTxtContent);
+        // since sitemap or base url might be referenced elsewhere, refresh robots.txt too
+        updateRobotsTxt();
 
         $_SESSION['flash_message'] = 'Scripts settings updated successfully.';
         $_SESSION['flash_type'] = 'success';
@@ -851,6 +879,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
+    if (isset($_POST['clear_page_visits'])) {
+        $pdo->exec("DELETE FROM page_visits");
+        $_SESSION['flash_message'] = 'All page visit statistics have been cleared.';
+        $_SESSION['flash_type'] = 'warning';
+        header('Location: admin.php');
+        exit;
+    }
+
     if (isset($_POST['save_article'])) {
         $articleId = (int)($_POST['article_id'] ?? 0);
         $title = trim((string)($_POST['article_title'] ?? ''));
@@ -859,7 +895,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $category = trim((string)($_POST['article_category'] ?? ''));
         $excerpt = trim((string)($_POST['article_excerpt'] ?? ''));
         $image = trim((string)($_POST['article_image'] ?? ''));
+        $image2 = trim((string)($_POST['article_image2'] ?? ''));
         $content = trim((string)($_POST['article_content'] ?? ''));
+        $translatedTitle = trim((string)($_POST['article_translated_title'] ?? ''));
+        $translatedContent = trim((string)($_POST['article_translated_content'] ?? ''));
 
         if ($articleId <= 0 || $title === '' || $content === '' || $slug === '') {
             $_SESSION['flash_message'] = 'Article update failed. Title, slug, and content are required.';
@@ -881,8 +920,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
 
-        $stmt = $pdo->prepare("UPDATE articles SET title = ?, slug = ?, category = ?, excerpt = ?, image = ?, content = ? WHERE id = ?");
-        $stmt->execute([$title, $slug, $category, $excerpt, $image, $content, $articleId]);
+        // respect global translation settings if fields are empty
+        $autoTranslate = getSettingInt('auto_translate_enabled', 0, 0, 1) === 1;
+        $targetLang = trim((string)getSetting('auto_translate_target_language', ''));
+        $origLanguage = '';
+        if ($autoTranslate && $targetLang) {
+            if ($translatedTitle === '') {
+                $translatedTitle = translateText($title, $targetLang);
+            }
+            if ($translatedContent === '') {
+                $translatedContent = translateText($content, $targetLang);
+            }
+            $origLanguage = $targetLang;
+        }
+
+        $stmt = $pdo->prepare("UPDATE articles SET title = ?, slug = ?, category = ?, excerpt = ?, image = ?, image2 = ?, content = ?, translated_title = ?, translated_content = ?, orig_language = ? WHERE id = ?");
+        $stmt->execute([$title, $slug, $category, $excerpt, $image, $image2, $content, $translatedTitle ?: null, $translatedContent ?: null, $origLanguage, $articleId]);
+
+        // regenerate auto-tags if none exist
+        $existingTags = getArticleTags($articleId);
+        if (empty($existingTags)) {
+            $autoTags = generateAutoTags($title, $content);
+            foreach ($autoTags as $tag) {
+                addTagToArticle($articleId, $tag);
+            }
+        }
+
+        // refresh export artifacts after manual update
+        writeArticleExportFiles($articleId, $slug, [
+            'id' => $articleId,
+            'title' => $title,
+            'slug' => $slug,
+            'content' => $content,
+            'excerpt' => $excerpt,
+            'image' => $image ?: null,
+            'image2' => $image2 ?: null,
+            'translated_title' => $translatedTitle ?: null,
+            'translated_content' => $translatedContent ?: null,
+            'published_at' => date('c'),
+        ]);
+
         $_SESSION['flash_message'] = 'Article updated successfully.';
         $_SESSION['flash_type'] = 'success';
         header('Location: admin.php');
@@ -961,7 +1038,7 @@ $webSearch = trim($_GET['qw'] ?? '');
 $articleCategory = trim($_GET['cat'] ?? '');
 
 if (isset($_GET['export']) && $_GET['export'] === 'articles_json') {
-    $exportRows = $pdo->query("SELECT title, slug, excerpt, category, published_at FROM articles ORDER BY id DESC")->fetchAll(PDO::FETCH_ASSOC);
+    $exportRows = $pdo->query("SELECT title, slug, excerpt, category, image, image2, translated_title, translated_content, published_at FROM articles ORDER BY id DESC")->fetchAll(PDO::FETCH_ASSOC);
     header('Content-Type: application/json; charset=utf-8');
     header('Content-Disposition: attachment; filename=articles-export.json');
     echo json_encode($exportRows, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
@@ -969,13 +1046,13 @@ if (isset($_GET['export']) && $_GET['export'] === 'articles_json') {
 }
 
 if (isset($_GET['export']) && $_GET['export'] === 'articles_csv') {
-    $exportRows = $pdo->query("SELECT title, slug, category, published_at FROM articles ORDER BY id DESC")->fetchAll(PDO::FETCH_ASSOC);
+    $exportRows = $pdo->query("SELECT title, slug, category, image, image2, translated_title, published_at FROM articles ORDER BY id DESC")->fetchAll(PDO::FETCH_ASSOC);
     header('Content-Type: text/csv; charset=utf-8');
     header('Content-Disposition: attachment; filename=articles-export.csv');
     $out = fopen('php://output', 'w');
-    fputcsv($out, ['title', 'slug', 'category', 'published_at']);
+    fputcsv($out, ['title', 'slug', 'category', 'image', 'image2', 'translated_title', 'published_at']);
     foreach ($exportRows as $row) {
-        fputcsv($out, [$row['title'], $row['slug'], $row['category'], $row['published_at']]);
+        fputcsv($out, [$row['title'], $row['slug'], $row['category'], $row['image'], $row['image2'], $row['translated_title'], $row['published_at']]);
     }
     fclose($out);
     exit;
@@ -985,7 +1062,10 @@ $totalArticles = (int)$pdo->query("SELECT COUNT(*) FROM articles")->fetchColumn(
 $totalSources = (int)$pdo->query("SELECT COUNT(*) FROM rss_sources")->fetchColumn();
 $totalWebSources = (int)$pdo->query("SELECT COUNT(*) FROM web_sources")->fetchColumn();
 $latestDate = $pdo->query("SELECT MAX(published_at) FROM articles")->fetchColumn();
-$pageVisitStats = getPageVisitStats(7);
+
+// allow filtering of page visit stats
+$pageVisitSearch = trim($_GET['pv_search'] ?? '');
+$pageVisitStats = getPageVisitStats(7, $pageVisitSearch);
 $totalTrackedViews = 0;
 $totalTrackedVisitors = 0;
 foreach ($pageVisitStats as $visitRow) {
@@ -1004,6 +1084,11 @@ $seoImageTitleSuffix = (string)getSetting('seo_image_title_suffix', ' - photo');
 $seoAutoLinkRules = (string)getSetting('seo_auto_link_rules', '');
 $seoAutoLinkAutoInternal = getSettingInt('seo_auto_link_auto_internal', 1, 0, 1) === 1;
 $seoAutoLinkMaxPerArticle = getSettingInt('seo_auto_link_max_per_article', 3, 1, 10);
+
+// translation feature toggles
+$autoTranslateEnabled = getSettingInt('auto_translate_enabled', 0, 0, 1) === 1;
+$autoTranslateTarget = trim((string)getSetting('auto_translate_target_language', ''));
+
 $googleAnalyticsId = (string)getSetting('google_analytics_id', '');
 $googleTagManagerId = (string)getSetting('google_tag_manager_id', '');
 $googleSiteVerification = (string)getSetting('google_site_verification', '');
@@ -1011,6 +1096,7 @@ $bingSiteVerification = (string)getSetting('bing_site_verification', '');
 $metaPixelId = (string)getSetting('meta_pixel_id', '');
 $customHeadScripts = (string)getSetting('custom_head_scripts', '');
 $customBodyScripts = (string)getSetting('custom_body_scripts', '');
+$adsTxtContent = (string)getSetting('ads_txt', '');
 $siteBaseUrl = getSiteBaseUrl();
 $sitemapUrl = $siteBaseUrl !== '' ? ($siteBaseUrl . '/sitemap.php') : '/sitemap.php';
 
@@ -1074,7 +1160,7 @@ $autoTitleFixedTitles = (string)getSetting('auto_title_fixed_titles', $autoTitle
 $cronUrl = getCronEndpointUrl();
 $categoryOptions = $pdo->query("SELECT DISTINCT category FROM articles WHERE category IS NOT NULL AND category != '' ORDER BY category ASC")->fetchAll(PDO::FETCH_COLUMN);
 
-$articleSql = "SELECT id, title, slug, category, excerpt, image, content, published_at FROM articles";
+$articleSql = "SELECT id, title, slug, category, excerpt, image, image2, translated_title, translated_content, content, published_at FROM articles";
 $articleParams = [];
 $articleClauses = [];
 if ($articleSearch !== '') {
@@ -1117,7 +1203,88 @@ if ($webSearch !== '') {
     $webParams['url'] = '%' . $webSearch . '%';
 }
 $webSql .= " ORDER BY id DESC";
-$webStmt = $pdo->prepare($webSql);
+// Niche management POST handlers
+    if (isset($_POST['create_niche'])) {
+        $rawSlug = trim((string)($_POST['niche_slug'] ?? ''));
+        $name = trim((string)($_POST['niche_name'] ?? ''));
+        $description = trim((string)($_POST['niche_description'] ?? ''));
+        if ($name === '') {
+            $_SESSION['flash_message'] = 'Niche name is required.';
+            $_SESSION['flash_type'] = 'danger';
+            header('Location: admin.php');
+            exit;
+        }
+        $slug = $rawSlug !== '' ? slugify($rawSlug) : slugify($name);
+        $id = \App\NicheManager::createNiche($slug, $name, $description);
+        if ($id > 0) {
+            $_SESSION['flash_message'] = 'Niche created successfully.';
+            $_SESSION['flash_type'] = 'success';
+        } else {
+            $_SESSION['flash_message'] = 'Failed to create niche.';
+            $_SESSION['flash_type'] = 'danger';
+        }
+        header('Location: admin.php');
+        exit;
+    }
+
+    if (isset($_POST['delete_niche'])) {
+        $nicheId = (int)($_POST['niche_id'] ?? 0);
+        if ($nicheId > 0) {
+            $stmt = $pdo->prepare('DELETE FROM niches WHERE id = ?');
+            $stmt->execute([$nicheId]);
+            $_SESSION['flash_message'] = 'Niche deleted.';
+            $_SESSION['flash_type'] = 'success';
+        } else {
+            $_SESSION['flash_message'] = 'Invalid niche selected.';
+            $_SESSION['flash_type'] = 'danger';
+        }
+        header('Location: admin.php');
+        exit;
+    }
+
+    if (isset($_POST['add_niche_source'])) {
+        $nicheId = (int)($_POST['niche_id'] ?? 0);
+        $type = trim((string)($_POST['source_type'] ?? 'rss')) === 'web' ? 'web' : 'rss';
+        $url = trim((string)($_POST['source_url'] ?? ''));
+        if ($nicheId > 0 && $url !== '') {
+            \App\NicheManager::addSource($nicheId, $type, $url);
+            $_SESSION['flash_message'] = 'Source added.';
+            $_SESSION['flash_type'] = 'success';
+        } else {
+            $_SESSION['flash_message'] = 'Invalid niche or URL.';
+            $_SESSION['flash_type'] = 'danger';
+        }
+        header('Location: admin.php');
+        exit;
+    }
+
+    if (isset($_POST['remove_niche_source'])) {
+        $sourceId = (int)($_POST['source_id'] ?? 0);
+        if ($sourceId > 0) {
+            $stmt = $pdo->prepare('DELETE FROM niche_sources WHERE id = ?');
+            $stmt->execute([$sourceId]);
+            $_SESSION['flash_message'] = 'Source removed.';
+            $_SESSION['flash_type'] = 'success';
+        } else {
+            $_SESSION['flash_message'] = 'Invalid source selected.';
+            $_SESSION['flash_type'] = 'danger';
+        }
+        header('Location: admin.php');
+        exit;
+    }
+
+    if (isset($_POST['set_active_niche'])) {
+        $slug = trim((string)($_POST['active_niche'] ?? ''));
+        if ($slug !== '') {
+            setSetting('active_niche', $slug);
+            $_SESSION['flash_message'] = 'Active niche updated.';
+            $_SESSION['flash_type'] = 'success';
+        }
+        header('Location: admin.php');
+        exit;
+    }
+
+    $webStmt = $pdo->prepare($webSql);
 foreach ($webParams as $key => $value) {
     $webStmt->bindValue(':' . $key, $value, PDO::PARAM_STR);
 }
@@ -1409,8 +1576,17 @@ $settingsRows = $settingsStmt->fetchAll(PDO::FETCH_ASSOC);
         <div class="card-body py-3">
             <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
                 <h6 class="mb-0"><i class="bi bi-graph-up-arrow"></i> Visitor Analytics by Page</h6>
-                <small class="text-light-emphasis">Compact view · top <?= count($pageVisitStats) ?> pages</small>
+                    <small class="text-light-emphasis">Compact view · top <?= count($pageVisitStats) ?> pages</small>
             </div>
+
+                <form method="get" class="mb-2 d-flex gap-2">
+                    <input type="text" name="pv_search" class="form-control form-control-sm" placeholder="Filter pages" value="<?= e($pageVisitSearch) ?>">
+                    <button class="btn btn-sm btn-outline-light">Go</button>
+                </form>
+                <form method="post" class="mb-2">
+                    <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
+                    <button name="clear_page_visits" value="1" class="btn btn-sm btn-outline-danger" onclick="return confirm('This will remove all stored page visit records. Proceed?')">Clear all visits</button>
+                </form>
 
             <?php if (!$pageVisitStats): ?>
                 <small class="text-secondary">No visit data yet. Open the public pages and stats will appear automatically.</small>
@@ -1557,8 +1733,27 @@ $settingsRows = $settingsStmt->fetchAll(PDO::FETCH_ASSOC);
                             </div>
                         </div>
 
+                        <!-- translation settings -->
+                        <div class="col-12"><hr class="border-secondary-subtle"></div>
+                        <div class="col-12">
+                            <h6 class="mb-1">Auto Translation</h6>
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="auto_translate_enabled" id="auto_translate_enabled" <?= $autoTranslateEnabled ? 'checked' : '' ?>>
+                                <label class="form-check-label" for="auto_translate_enabled">Enable automatic translation for new articles</label>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Target language code</label>
+                            <input type="text" name="auto_translate_target_language" class="form-control" maxlength="5" value="<?= e($autoTranslateTarget) ?>" placeholder="e.g. ar">
+                        </div>
+
                         <div class="col-12">
                             <button name="update_seo_settings" value="1" class="btn btn-outline-light w-100">Save SEO Settings</button>
+                        </div>
+                        <div class="col-12">
+                            <button name="ping_sitemap" value="1" class="btn btn-outline-secondary w-100 mt-2">Ping Search Engines Now</button>
                         </div>
                     </form>
                     <small class="text-secondary">Manage global metadata for homepage, article title suffix, robots rules, and social sharing tags.</small>
@@ -1628,31 +1823,23 @@ $settingsRows = $settingsStmt->fetchAll(PDO::FETCH_ASSOC);
                     </div>
                 </div>
             </div>
-
-            <div class="card section-card mb-3" id="scripts-settings">
-                <div class="card-body">
-                    <h5><i class="bi bi-code-slash"></i> Scripts Settings</h5>
-                    <form method="post" class="row g-2 align-items-end">
-                        <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
-                        <div class="col-12">
-                            <label class="form-label">Google Analytics ID</label>
-                            <input type="text" name="google_analytics_id" class="form-control" maxlength="30" value="<?= e($googleAnalyticsId) ?>" placeholder="G-XXXXXXXXXX">
-                            <small class="text-secondary">Supports GA4, GT, UA, and Google Ads IDs.</small>
-                        </div>
-                        <div class="col-12">
-                            <label class="form-label">Google Tag Manager ID</label>
-                            <input type="text" name="google_tag_manager_id" class="form-control" maxlength="20" value="<?= e($googleTagManagerId) ?>" placeholder="GTM-XXXXXXX">
-                        </div>
-                        <div class="col-12">
-                            <label class="form-label">Google Site Verification</label>
-                            <input type="text" name="google_site_verification" class="form-control" maxlength="255" value="<?= e($googleSiteVerification) ?>" placeholder="google-site-verification token">
-                            <small class="text-secondary">Paste token from Search Console meta tag content.</small>
-                        </div>
-                        <div class="col-12">
-                            <label class="form-label">Bing Site Verification</label>
-                            <input type="text" name="bing_site_verification" class="form-control" maxlength="255" value="<?= e($bingSiteVerification) ?>" placeholder="msvalidate.01 token">
-                            <small class="text-secondary">Paste token from Bing Webmaster Tools meta tag content.</small>
-                        </div>
++            
++            <!-- ads.txt editor card -->
++            <div class="card section-card mb-3" id="ads-txt-editor">
++                <div class="card-body">
++                    <h5><i class="bi bi-file-text"></i> ads.txt</h5>
++                    <form method="post">
++                        <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
++                        <div class="mb-2">
++                            <textarea name="ads_txt_content" class="form-control" rows="6" placeholder="Enter ads.txt content"><?= e($adsTxtContent) ?></textarea>
++                        </div>
++                        <button name="save_ads_txt" value="1" class="btn btn-outline-light btn-sm">Save ads.txt</button>
++                    </form>
++                    <small class="text-secondary">Modify the advertising file served at <code>/ads.txt</code>.</small>
++                </div>
++            </div>
+*** End Patch
+            <!-- moved scripts inputs into SEO card above -->
                         <div class="col-12">
                             <label class="form-label">Meta Pixel ID</label>
                             <input type="text" name="meta_pixel_id" class="form-control" maxlength="30" value="<?= e($metaPixelId) ?>" placeholder="123456789012345">
@@ -1674,6 +1861,110 @@ $settingsRows = $settingsStmt->fetchAll(PDO::FETCH_ASSOC);
                         <div><strong>Sitemap URL:</strong> <code><?= e($sitemapUrl) ?></code></div>
                         <div class="small mt-2">Submit this URL in Google Search Console and Bing Webmaster Tools for faster indexing.</div>
                     </div>
+                </div>
+            </div>
+
+            <div class="card section-card mb-3" id="niche-management">
+                <div class="card-body">
+                    <h5><i class="bi bi-kanban-fill"></i> Niche Management</h5>
+
+                    <form method="post" class="row g-2 mb-3">
+                        <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
+                        <div class="col-12">
+                            <label class="form-label">Create New Niche</label>
+                        </div>
+                        <div class="col-4">
+                            <input type="text" name="niche_slug" class="form-control" placeholder="slug (optional)">
+                        </div>
+                        <div class="col-4">
+                            <input type="text" name="niche_name" class="form-control" placeholder="Display name" required>
+                        </div>
+                        <div class="col-4">
+                            <input type="text" name="niche_description" class="form-control" placeholder="Short description">
+                        </div>
+                        <div class="col-12">
+                            <button name="create_niche" value="1" class="btn btn-outline-light">Create Niche</button>
+                        </div>
+                    </form>
+
+                    <?php
+                    $nichesListStmt = $pdo->query("SELECT id, slug, name, description FROM niches ORDER BY id");
+                    $nichesList = $nichesListStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+                    ?>
+
+                    <div class="mb-2">
+                        <label class="form-label">Active Niche</label>
+                        <form method="post" class="d-flex gap-2 align-items-center mb-2">
+                            <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
+                            <select name="active_niche" class="form-select">
+                                <?php foreach ($nichesList as $n): ?>
+                                    <option value="<?= e($n['slug']) ?>" <?= e((string)getSetting('active_niche', 'general')) === $n['slug'] ? 'selected' : '' ?>><?= e($n['name']) ?> (<?= e($n['slug']) ?>)</option>
+                                <?php endforeach; ?>
+                            </select>
+                            <button name="set_active_niche" class="btn btn-sm btn-outline-light">Set</button>
+                        </form>
+                    </div>
+
+                    <div class="list-group mb-3">
+                        <?php foreach ($nichesList as $n): ?>
+                            <div class="list-group-item">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <strong><?= e($n['name']) ?></strong>
+                                        <div class="small text-secondary"><?= e($n['slug']) ?> — <?= e($n['description']) ?></div>
+                                    </div>
+                                    <div class="text-end">
+                                        <form method="post" onsubmit="return confirm('Delete this niche?');" class="d-inline">
+                                            <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
+                                            <input type="hidden" name="niche_id" value="<?= (int)$n['id'] ?>">
+                                            <button name="delete_niche" class="btn btn-sm btn-danger">Delete</button>
+                                        </form>
+                                    </div>
+                                </div>
+
+                                <?php
+                                    $srcStmt = $pdo->prepare('SELECT id, type, url FROM niche_sources WHERE niche_id = ? ORDER BY id');
+                                    $srcStmt->execute([(int)$n['id']]);
+                                    $sources = $srcStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+                                ?>
+                                <div class="mt-2 small">
+                                    <?php if (empty($sources)): ?>
+                                        <em class="text-secondary">No sources configured.</em>
+                                    <?php else: ?>
+                                        <?php foreach ($sources as $s): ?>
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <div><strong>[<?= e($s['type']) ?>]</strong> <?= e($s['url']) ?></div>
+                                                <form method="post" class="ms-2">
+                                                    <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
+                                                    <input type="hidden" name="source_id" value="<?= (int)$s['id'] ?>">
+                                                    <button name="remove_niche_source" class="btn btn-sm btn-outline-light">Remove</button>
+                                                </form>
+                                            </div>
+                                        <?php endforeach; ?>
+                                    <?php endif; ?>
+                                </div>
+
+                                <form method="post" class="row g-2 mt-2">
+                                    <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
+                                    <input type="hidden" name="niche_id" value="<?= (int)$n['id'] ?>">
+                                    <div class="col-4">
+                                        <select name="source_type" class="form-select">
+                                            <option value="rss">RSS</option>
+                                            <option value="web">Web</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-6">
+                                        <input type="url" name="source_url" class="form-control" placeholder="https://example.com/feed.xml" required>
+                                    </div>
+                                    <div class="col-2">
+                                        <button name="add_niche_source" class="btn btn-outline-light w-100">Add</button>
+                                    </div>
+                                </form>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+
+                    <small class="text-secondary">Use niches to segment sources and generate content for different verticals (e.g., EVs, Motorcycles, Home Appliances).</small>
                 </div>
             </div>
 
@@ -2088,8 +2379,12 @@ $settingsRows = $settingsStmt->fetchAll(PDO::FETCH_ASSOC);
                                                             <input type="text" name="article_category" class="form-control" value="<?= e($row['category']) ?>">
                                                         </div>
                                                         <div class="col-12">
-                                                            <label class="form-label">Image URL</label>
+                                                            <label class="form-label">Primary Image URL</label>
                                                             <input type="url" name="article_image" class="form-control" value="<?= e($row['image']) ?>">
+                                                        </div>
+                                                        <div class="col-12">
+                                                            <label class="form-label">Secondary Image URL</label>
+                                                            <input type="url" name="article_image2" class="form-control" value="<?= e($row['image2'] ?? '') ?>">
                                                         </div>
                                                         <div class="col-12">
                                                             <label class="form-label">Excerpt</label>
@@ -2098,6 +2393,14 @@ $settingsRows = $settingsStmt->fetchAll(PDO::FETCH_ASSOC);
                                                         <div class="col-12">
                                                             <label class="form-label">Content (HTML)</label>
                                                             <textarea name="article_content" class="form-control" rows="8" required><?= e($row['content']) ?></textarea>
+                                                        </div>
+                                                        <div class="col-12">
+                                                            <label class="form-label">Translated Title (optional)</label>
+                                                            <input type="text" name="article_translated_title" class="form-control" value="<?= e($row['translated_title'] ?? '') ?>">
+                                                        </div>
+                                                        <div class="col-12">
+                                                            <label class="form-label">Translated Content (optional)</label>
+                                                            <textarea name="article_translated_content" class="form-control" rows="4"><?= e($row['translated_content'] ?? '') ?></textarea>
                                                         </div>
                                                         <div class="col-12">
                                                             <button name="save_article" value="1" class="btn btn-success w-100">Save Changes</button>

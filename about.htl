@@ -2,11 +2,10 @@
 <html lang="en" dir="ltr">
 <head>
   <meta charset="UTF-8">
+  <meta http-equiv="refresh" content="0;url=index.php?doc=about">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="description" content="Learn about our mission and publishing standards.">
   <title>About Us</title>
-  <style>
-    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#fff7ed;color:#1f2937;line-height:1.8}
     .wrap{max-width:760px;margin:auto;padding:16px}
     .card{background:#fff;border:1px solid #fed7aa;border-radius:14px;padding:16px;box-shadow:0 4px 14px rgba(0,0,0,.06)}
     a{color:#c2410c;text-decoration:none}
@@ -38,7 +37,7 @@
             message: 'This website uses an international cookie consent notice to meet global privacy and advertising requirements.',
             dismiss: 'Accept',
             link: 'Privacy Policy',
-            href: 'privercy.html'
+            href: 'index.php?doc=privacy'
           }
         });
       }

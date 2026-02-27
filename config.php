@@ -18,18 +18,81 @@ function db_connect() {
 // إنشاء الجداول عند أول تشغيل
 $pdo = db_connect();
 $pdo->exec("CREATE TABLE IF NOT EXISTS articles (
-    id INTEGER PRIMARY KEY, 
-    title TEXT UNIQUE, 
-    slug TEXT UNIQUE, 
-    content TEXT, 
-    image TEXT, 
-    excerpt TEXT, 
+    id INTEGER PRIMARY KEY,
+    title TEXT UNIQUE,
+    slug TEXT UNIQUE,
+    content TEXT,
+    image TEXT,
+    image2 TEXT,
+    excerpt TEXT,
     published_at TEXT,
-    category TEXT
+    category TEXT,
+    niche_id INTEGER DEFAULT 1,
+    translated_title TEXT,
+    translated_content TEXT,
+    orig_language TEXT
 )");
 $pdo->exec("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)");
 $pdo->exec("CREATE TABLE IF NOT EXISTS rss_sources (id INTEGER PRIMARY KEY, url TEXT)");
 $pdo->exec("CREATE TABLE IF NOT EXISTS web_sources (id INTEGER PRIMARY KEY, url TEXT)");
+// Niches support: separate niches and their sources
+$pdo->exec("CREATE TABLE IF NOT EXISTS niches (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    slug TEXT UNIQUE NOT NULL,
+    name TEXT NOT NULL,
+    description TEXT DEFAULT ''
+)");
+$pdo->exec("CREATE TABLE IF NOT EXISTS niche_sources (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    niche_id INTEGER NOT NULL,
+    type TEXT NOT NULL CHECK(type IN ('rss','web')),
+    url TEXT NOT NULL,
+    UNIQUE(niche_id, type, url),
+    FOREIGN KEY(niche_id) REFERENCES niches(id) ON DELETE CASCADE
+)");
+
+// Tags system for better SEO and filtering
+$pdo->exec("CREATE TABLE IF NOT EXISTS tags (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT UNIQUE NOT NULL,
+    slug TEXT UNIQUE NOT NULL,
+    description TEXT DEFAULT '',
+    post_count INTEGER DEFAULT 0
+)");
+$pdo->exec("CREATE TABLE IF NOT EXISTS article_tags (
+    article_id INTEGER NOT NULL,
+    tag_id INTEGER NOT NULL,
+    PRIMARY KEY(article_id, tag_id),
+    FOREIGN KEY(article_id) REFERENCES articles(id) ON DELETE CASCADE,
+    FOREIGN KEY(tag_id) REFERENCES tags(id) ON DELETE CASCADE
+)");
+
+// Article ratings and engagement metrics
+$pdo->exec("CREATE TABLE IF NOT EXISTS article_stats (
+    article_id INTEGER PRIMARY KEY,
+    views INTEGER DEFAULT 0,
+    clicks INTEGER DEFAULT 0,
+    avg_rating REAL DEFAULT 0,
+    rating_count INTEGER DEFAULT 0,
+    shares INTEGER DEFAULT 0,
+    updated_at INTEGER DEFAULT 0,
+    FOREIGN KEY(article_id) REFERENCES articles(id) ON DELETE CASCADE
+)");
+
+$pdo->exec("CREATE TABLE IF NOT EXISTS article_ratings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    article_id INTEGER NOT NULL,
+    rating INTEGER NOT NULL CHECK(rating BETWEEN 1 AND 5),
+    visitor_hash TEXT NOT NULL,
+    created_at INTEGER DEFAULT 0,
+    UNIQUE(article_id, visitor_hash),
+    FOREIGN KEY(article_id) REFERENCES articles(id) ON DELETE CASCADE
+)");
+
+$pdo->exec("CREATE INDEX IF NOT EXISTS idx_article_tags_tag ON article_tags(tag_id)");
+$pdo->exec("CREATE INDEX IF NOT EXISTS idx_tags_slug ON tags(slug)");
+$pdo->exec("CREATE INDEX IF NOT EXISTS idx_article_stats_views ON article_stats(views DESC)");
+$pdo->exec("CREATE INDEX IF NOT EXISTS idx_article_stats_avg_rating ON article_stats(avg_rating DESC)");
 $pdo->exec("CREATE TABLE IF NOT EXISTS url_cache (
     url TEXT PRIMARY KEY,
     body TEXT,
@@ -81,6 +144,28 @@ $pdo->exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_web_sources_url ON web_sources
 $pdo->exec("CREATE INDEX IF NOT EXISTS idx_articles_category_published_id ON articles(category, published_at, id)");
 $pdo->exec("CREATE INDEX IF NOT EXISTS idx_articles_published_id ON articles(published_at, id)");
 
+// Migration: add niche_id column if it doesn't exist
+try {
+    $pdo->exec("ALTER TABLE articles ADD COLUMN niche_id INTEGER DEFAULT 1");
+} catch (PDOException $e) {
+    // Column already exists or migration not needed
+}
+$pdo->exec("CREATE INDEX IF NOT EXISTS idx_articles_niche_id ON articles(niche_id)");
+
+// Migration: add secondary image and translation columns
+try {
+    $pdo->exec("ALTER TABLE articles ADD COLUMN image2 TEXT");
+} catch (PDOException $e) {}
+try {
+    $pdo->exec("ALTER TABLE articles ADD COLUMN translated_title TEXT");
+} catch (PDOException $e) {}
+try {
+    $pdo->exec("ALTER TABLE articles ADD COLUMN translated_content TEXT");
+} catch (PDOException $e) {}
+try {
+    $pdo->exec("ALTER TABLE articles ADD COLUMN orig_language TEXT");
+} catch (PDOException $e) {}
+
 // إعدادات افتراضية
 $defaults = [
     'site_title' => SITE_TITLE,
@@ -102,6 +187,9 @@ $defaults = [
     'queue_max_attempts' => '3',
     'queue_source_cooldown_seconds' => '180',
     'visit_excluded_ips' => '',
+    // translation settings
+    'auto_translate_enabled' => '0',
+    'auto_translate_target_language' => '',
     'auto_title_mode' => 'template',
     'auto_title_min_year_offset' => '0',
     'auto_title_max_year_offset' => '1',
@@ -138,7 +226,8 @@ $defaults = [
     'ads_min_article_words' => '420',
     'ads_blocked_title_keywords' => '',
     'ads_label_text' => 'Sponsored',
-    'ads_html_code' => '<div class="ad-unit-inner">Place your ad code here</div>'
+    'ads_html_code' => '<div class="ad-unit-inner">Place your ad code here</div>',
+    'ads_txt' => '',
 ];
 foreach ($defaults as $k => $v) {
     $pdo->prepare("INSERT OR IGNORE INTO settings (key,value) VALUES (?,?)")->execute([$k, $v]);
@@ -159,6 +248,25 @@ if ($migrationApplied === false) {
     $pdo->prepare("INSERT OR IGNORE INTO settings (key, value) VALUES ('fetch_user_agent', 'Mozilla/5.0 (compatible; VitoBot/1.0; +https://example.com/bot)')")->execute();
     $pdo->prepare("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
         ->execute([$migrationKey, date('Y-m-d H:i:s')]);
+}
+
+// Default tags for better content organization and SEO
+$default_tags = [
+    ['Review', 'content insights for car buyers'],
+    ['Maintenance', 'keep your vehicle running smoothly'],
+    ['Safety', 'driving safety and crash prevention'],
+    ['Buying Guide', 'everything to know before purchasing'],
+    ['Performance', 'engine power and driving dynamics'],
+    ['Electric Vehicles', 'EV charging, batteries, and efficiency'],
+    ['SUV', 'sport utility vehicles and crossovers'],
+    ['Sedan', 'luxury and practical four-door cars'],
+    ['Comparison', 'head-to-head model analysis'],
+    ['Technology', 'infotainment and automotive tech'],
+];
+foreach ($default_tags as [$name, $description]) {
+    $slug = preg_replace('/[^a-z0-9]+/', '-', strtolower($name));
+    $pdo->prepare("INSERT OR IGNORE INTO tags (name, slug, description) VALUES (?, ?, ?)")
+        ->execute([$name, $slug, $description]);
 }
 
 // مصادر RSS افتراضية

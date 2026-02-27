@@ -10,7 +10,7 @@ if ($baseUrl === '') {
 }
 
 $publicationName = getSiteTitle();
-$publicationLanguage = 'ar';
+$publicationLanguage = detectPreferredLanguage() ?: 'en';
 
 $urls = [];
 $urls[] = [
@@ -21,7 +21,7 @@ $urls[] = [
     'news' => null,
 ];
 
-$stmt = $pdo->query("SELECT title, slug, category, published_at FROM articles ORDER BY datetime(published_at) DESC");
+$stmt = $pdo->query("SELECT title, slug, category, published_at, image, image2 FROM articles ORDER BY datetime(published_at) DESC");
 while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
     $publishedAt = trim((string)($row['published_at'] ?? ''));
     $title = trim((string)($row['title'] ?? ''));
@@ -36,7 +36,7 @@ while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
     $publicationDate = date('c', $timestamp);
     $publicationDay = date('l', $timestamp);
 
-    $urls[] = [
+    $itemEntry = [
         'loc' => $baseUrl . '/index.php?slug=' . rawurlencode((string)$row['slug']),
         'lastmod' => $lastmod,
         'changefreq' => 'daily',
@@ -47,13 +47,24 @@ while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
             'day' => $publicationDay,
             'keywords' => $category !== '' ? $category . ', ' . $publicationDay : $publicationDay,
         ],
+        'images' => [],
     ];
+
+    if (trim((string)$row['image']) !== '') {
+        $itemEntry['images'][] = ['loc' => $baseUrl . '/' . ltrim((string)$row['image'], '/'), 'caption' => $title];
+    }
+    if (trim((string)$row['image2']) !== '') {
+        $itemEntry['images'][] = ['loc' => $baseUrl . '/' . ltrim((string)$row['image2'], '/'), 'caption' => $title];
+    }
+
+    $urls[] = $itemEntry;
 }
 
 echo "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
 ?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
-        xmlns:news="http://www.google.com/schemas/sitemap-news/0.9">
+        xmlns:news="http://www.google.com/schemas/sitemap-news/0.9"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
 <?php foreach ($urls as $item): ?>
     <url>
         <loc><?= e($item['loc']) ?></loc>
@@ -70,6 +81,16 @@ echo "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
             <news:title><?= e($item['news']['title']) ?></news:title>
             <news:keywords><?= e($item['news']['keywords']) ?></news:keywords>
         </news:news>
+<?php endif; ?>
+<?php if (!empty($item['images']) && is_array($item['images'])): ?>
+    <?php foreach ($item['images'] as $img): ?>
+        <image:image>
+            <image:loc><?= e($img['loc']) ?></image:loc>
+            <?php if (!empty($img['caption'])): ?>
+                <image:caption><?= e($img['caption']) ?></image:caption>
+            <?php endif; ?>
+        </image:image>
+    <?php endforeach; ?>
 <?php endif; ?>
     </url>
 <?php endforeach; ?>

@@ -6,31 +6,245 @@ if (is_file($composerAutoload)) {
     require_once $composerAutoload;
 }
 
+use App\Utils;
+
 function slugify($text) {
-    $text = strtolower(trim($text));
-    $text = preg_replace('/[^a-z0-9]+/', '-', $text);
-    return trim($text, '-');
+    // wrapper for App\Utils::slugify; kept for backward compatibility
+    return Utils::slugify((string)$text);
 }
 
 function e($text) {
-    return htmlspecialchars((string)$text, ENT_QUOTES, 'UTF-8');
+    return Utils::e((string)$text);
 }
 
 function detectPreferredLanguage() {
-    $queryLang = strtolower(trim((string)($_GET['lang'] ?? '')));
-    if (in_array($queryLang, ['ar', 'en'], true)) {
-        return $queryLang;
-    }
-
-    $countryCode = strtoupper(trim((string)($_SERVER['HTTP_CF_IPCOUNTRY'] ?? $_SERVER['GEOIP_COUNTRY_CODE'] ?? '')));
-    $arabicCountries = ['SA', 'AE', 'EG', 'KW', 'QA', 'BH', 'OM', 'JO', 'LB', 'SY', 'IQ', 'YE', 'MA', 'DZ', 'TN', 'LY', 'SD', 'PS', 'MR', 'SO', 'DJ', 'KM'];
-    if ($countryCode !== '') {
-        return in_array($countryCode, $arabicCountries, true) ? 'ar' : 'en';
-    }
-
-    $acceptLanguage = strtolower((string)($_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? ''));
-    return str_starts_with($acceptLanguage, 'ar') ? 'ar' : 'en';
+    // maintain compatibility while delegating to the namespaced utility
+    return Utils::detectPreferredLanguage();
 }
+
+/**
+ * Niche helpers: get active niche slug (from query or default) and list available niches
+ */
+function getActiveNicheSlug() {
+    $q = trim((string)($_GET['niche'] ?? ''));
+    if ($q !== '') return $q;
+    return trim((string)getSetting('active_niche', 'general'));
+}
+
+function setActiveNicheSlug($slug) {
+    setSetting('active_niche', trim((string)$slug));
+}
+
+function listNiches() {
+    if (!class_exists('App\\NicheManager')) return [];
+    return \App\NicheManager::listNiches();
+}
+
+function seedDefaultNiches() {
+    if (!class_exists('App\\NicheManager')) return;
+    \App\NicheManager::seedDefaults();
+}
+
+/**
+ * Get niche ID for the active niche slug. Returns 1 (general) if not found.
+ */
+function getActiveNicheId() {
+    $slug = getActiveNicheSlug();
+    if (!class_exists('App\\NicheManager')) return 1;
+    $niche = \App\NicheManager::getNicheBySlug($slug);
+    return $niche ? (int)$niche['id'] : 1;
+}
+
+/**
+ * Get RSS sources for a specific niche (or active niche if not specified)
+ */
+function getNicheRssSources($nicheSlug = '') {
+    if ($nicheSlug === '') $nicheSlug = getActiveNicheSlug();
+    if (!class_exists('App\\NicheManager')) return [];
+    
+    $niche = \App\NicheManager::getNicheBySlug($nicheSlug);
+    if (!$niche) return [];
+    
+    $sources = \App\NicheManager::getSourcesForNiche((int)$niche['id'], 'rss');
+    return array_map(function($s) { return $s['url']; }, $sources);
+}
+
+/**
+ * Get web sources for a specific niche (or active niche if not specified)
+ */
+function getNicheWebSources($nicheSlug = '') {
+    if ($nicheSlug === '') $nicheSlug = getActiveNicheSlug();
+    if (!class_exists('App\\NicheManager')) return [];
+    
+    $niche = \App\NicheManager::getNicheBySlug($nicheSlug);
+    if (!$niche) return [];
+    
+    $sources = \App\NicheManager::getSourcesForNiche((int)$niche['id'], 'web');
+    return array_map(function($s) { return $s['url']; }, $sources);
+}
+
+/**
+ * Tags/Keywords system helpers
+ */
+function getTags() {
+    $pdo = db_connect();
+    $stmt = $pdo->query("SELECT id, name, slug, description, post_count FROM tags ORDER BY post_count DESC");
+    return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+}
+
+function addTagToArticle($articleId, $tagName) {
+    $pdo = db_connect();
+    $slug = preg_replace('/[^a-z0-9]+/', '-', strtolower($tagName));
+    
+    // Ensure tag exists
+    $pdo->prepare("INSERT OR IGNORE INTO tags (name, slug, description) VALUES (?, ?, ?)")
+        ->execute([$tagName, $slug, '']);
+    
+    $tagStmt = $pdo->prepare("SELECT id FROM tags WHERE slug = ? LIMIT 1");
+    $tagStmt->execute([$slug]);
+    $tagId = (int)$tagStmt->fetchColumn();
+    
+    if ($tagId > 0) {
+        $pdo->prepare("INSERT OR IGNORE INTO article_tags (article_id, tag_id) VALUES (?, ?)")
+            ->execute([(int)$articleId, $tagId]);
+            
+        $pdo->prepare("UPDATE tags SET post_count = post_count + 1 WHERE id = ? AND post_count = (SELECT COUNT(*) - 1 FROM article_tags WHERE tag_id = ?)")
+            ->execute([$tagId, $tagId]);
+    }
+}
+
+function getArticleTags($articleId) {
+    $pdo = db_connect();
+    $stmt = $pdo->prepare("SELECT t.id, t.name, t.slug FROM tags t JOIN article_tags at ON t.id = at.tag_id WHERE at.article_id = ? ORDER BY t.name");
+    $stmt->execute([(int)$articleId]);
+    return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+}
+
+function getArticlesForTag($tagSlug, $limit = 12) {
+    $pdo = db_connect();
+    $stmt = $pdo->prepare("
+        SELECT a.id, a.title, a.slug, a.excerpt, a.image, a.image2, a.translated_title, a.published_at 
+        FROM articles a
+        JOIN article_tags at ON a.id = at.article_id
+        JOIN tags t ON at.tag_id = t.id
+        WHERE t.slug = ?
+        ORDER BY a.published_at DESC
+        LIMIT ?
+    ");
+    $stmt->execute([$tagSlug, (int)$limit]);
+    return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+}
+
+/**
+ * Article stats and ratings
+ */
+function initArticleStats($articleId) {
+    $pdo = db_connect();
+    $pdo->prepare("INSERT OR IGNORE INTO article_stats (article_id, updated_at) VALUES (?, ?)")
+        ->execute([(int)$articleId, time()]);
+}
+
+function generateAutoTags($title, $content = '') {
+    $text = mb_strtolower($title . ' ' . strip_tags($content), 'UTF-8');
+    // simple stop words list
+    $stop = ['the','and','for','with','this','that','from','your','have','will','2026','best','new','review'];
+    preg_match_all('/\b[a-z0-9]{4,}\b/', $text, $matches);
+    $counts = array_count_values($matches[0]);
+    arsort($counts);
+    $tags = [];
+    foreach ($counts as $word => $cnt) {
+        if (in_array($word, $stop, true)) continue;
+        $tags[] = ucfirst($word);
+        if (count($tags) >= 5) break;
+    }
+    return $tags;
+}
+
+function translateText($text, $targetLang = 'ar') {
+    $text = trim((string)$text);
+    $targetLang = trim((string)$targetLang);
+    if ($text === '' || $targetLang === '') {
+        return '';
+    }
+    $url = 'https://api.mymemory.translated.net/get?q=' . rawurlencode($text) . '&langpair=en|' . rawurlencode($targetLang);
+    $resp = @file_get_contents($url);
+    if (!$resp) {
+        return '';
+    }
+    $data = json_decode($resp, true);
+    return $data['responseData']['translatedText'] ?? '';
+}
+
+function recordArticleView($articleId) {
+    $pdo = db_connect();
+    $pdo->prepare("UPDATE article_stats SET views = views + 1, updated_at = ? WHERE article_id = ?")
+        ->execute([time(), (int)$articleId]);
+}
+
+function rateArticle($articleId, $rating, $visitorHash = '') {
+    if ($rating < 1 || $rating > 5) return false;
+    
+    $pdo = db_connect();
+    $visitorHash = $visitorHash ?: getVisitorFingerprint();
+    
+    $pdo->prepare("INSERT OR REPLACE INTO article_ratings (article_id, rating, visitor_hash, created_at) VALUES (?, ?, ?, ?)")
+        ->execute([(int)$articleId, (int)$rating, $visitorHash, time()]);
+    
+    // Update average rating
+    $avgStmt = $pdo->prepare("SELECT AVG(rating) as avg, COUNT(*) as count FROM article_ratings WHERE article_id = ?");
+    $avgStmt->execute([(int)$articleId]);
+    $row = $avgStmt->fetch(PDO::FETCH_ASSOC);
+    
+    $pdo->prepare("UPDATE article_stats SET avg_rating = ?, rating_count = ?, updated_at = ? WHERE article_id = ?")
+        ->execute([round($row['avg'], 1), (int)$row['count'], time(), (int)$articleId]);
+    
+    return true;
+}
+
+function getArticleStats($articleId) {
+    $pdo = db_connect();
+    $stmt = $pdo->prepare("SELECT views, clicks, avg_rating, rating_count, shares FROM article_stats WHERE article_id = ? LIMIT 1");
+    $stmt->execute([(int)$articleId]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    return $row ?: [
+        'views' => 0,
+        'clicks' => 0,
+        'avg_rating' => 0,
+        'rating_count' => 0,
+        'shares' => 0,
+    ];
+}
+
+function getTrendingArticles($limit = 10) {
+    $pdo = db_connect();
+    $stmt = $pdo->prepare("
+        SELECT a.id, a.title, a.slug, a.excerpt, a.image, a.published_at,
+               a.image2, a.translated_title,
+               s.views, s.avg_rating, s.rating_count
+        FROM articles a
+        LEFT JOIN article_stats s ON a.id = s.article_id
+        ORDER BY COALESCE(s.views, 0) DESC
+        LIMIT ?
+    ");
+    $stmt->execute([(int)$limit]);
+    return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+}
+
+function getTopRatedArticles($limit = 10) {
+    $pdo = db_connect();
+    $stmt = $pdo->prepare("
+        SELECT a.id, a.title, a.slug, a.excerpt, a.image, a.published_at,
+               s.views, s.avg_rating, s.rating_count
+        FROM articles a
+        LEFT JOIN article_stats s ON a.id = s.article_id
+        WHERE s.avg_rating > 0 AND s.rating_count > 0
+        ORDER BY s.avg_rating DESC, s.rating_count DESC
+        LIMIT ?
+    ");
+    $stmt->execute([(int)$limit]);
+    return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+}
+
 
 
 function getSiteTitle() {
@@ -199,10 +413,25 @@ function recordPageVisit($pageKey, $pageLabel) {
     ]);
 }
 
-function getPageVisitStats($limit = 8) {
+function getPageVisitStats($limit = 8, $search = '') {
     $limit = max(1, min(30, (int)$limit));
     $pdo = db_connect();
-    $stmt = $pdo->prepare("SELECT
+    if ($search !== '') {
+        $stmt = $pdo->prepare("SELECT
+            page_key,
+            MIN(page_label) AS page_label,
+            SUM(views) AS total_views,
+            COUNT(*) AS unique_visitors,
+            SUM(CASE WHEN updated_at >= :last_24h THEN 1 ELSE 0 END) AS visitors_24h,
+            MAX(updated_at) AS last_visit_at
+        FROM page_visits
+        WHERE page_label LIKE :search OR page_key LIKE :search
+        GROUP BY page_key
+        ORDER BY total_views DESC
+        LIMIT :limit");
+        $stmt->bindValue(':search', '%' . $search . '%', PDO::PARAM_STR);
+    } else {
+        $stmt = $pdo->prepare("SELECT
             page_key,
             MIN(page_label) AS page_label,
             SUM(views) AS total_views,
@@ -213,6 +442,7 @@ function getPageVisitStats($limit = 8) {
         GROUP BY page_key
         ORDER BY total_views DESC
         LIMIT :limit");
+    }
     $stmt->bindValue(':last_24h', time() - 86400, PDO::PARAM_INT);
     $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
     $stmt->execute();
@@ -630,7 +860,11 @@ function mergeAndDeduplicateTitles(array ...$collections) {
 
 function runRssWorkflow($limit = null) {
     $pdo = db_connect();
-    $sources = $pdo->query("SELECT url FROM rss_sources ORDER BY id DESC")->fetchAll(PDO::FETCH_COLUMN);
+    $nicheId = getActiveNicheId();
+    $sources = $pdo->prepare("SELECT url FROM niche_sources WHERE niche_id = ? AND type = 'rss' ORDER BY id DESC")->execute([$nicheId]) ?: [];
+    $sources = $pdo->prepare("SELECT url FROM niche_sources WHERE niche_id = ? AND type = 'rss' ORDER BY id DESC")->fetchAll(PDO::FETCH_COLUMN) ?: [];
+    // fallback to niche helpers which handle non-existent niches gracefully
+    $sources = getNicheRssSources() ?: [];
     $limit = $limit === null ? max(1, (int)getSetting('daily_limit', 5)) : max(1, (int)$limit);
     $batchSize = getSettingInt('workflow_batch_size', 8, 1, 30);
 
@@ -688,7 +922,8 @@ function runRssWorkflow($limit = null) {
 
 function runWebWorkflow($limit = null) {
     $pdo = db_connect();
-    $sources = $pdo->query("SELECT url FROM web_sources ORDER BY id DESC")->fetchAll(PDO::FETCH_COLUMN);
+    // Use active niche sources instead of global web_sources
+    $sources = getNicheWebSources() ?: [];
     $limit = $limit === null ? max(1, (int)getSetting('daily_limit', 5)) : max(1, (int)$limit);
     $batchSize = getSettingInt('workflow_batch_size', 8, 1, 30);
 
@@ -2139,6 +2374,36 @@ function executeStatementWithRetry(PDOStatement $statement, array $params, $maxA
     }
 }
 
+/**
+ * Notify search engines about sitemap updates. This is a best-effort ping; failures are ignored.
+ */
+function pingSearchEngines($sitemapUrl) {
+    $sitemapUrl = trim((string)$sitemapUrl);
+    if ($sitemapUrl === '') {
+        return false;
+    }
+    $targets = [
+        'https://www.google.com/ping?sitemap=' . rawurlencode($sitemapUrl),
+        'https://www.bing.com/ping?sitemap=' . rawurlencode($sitemapUrl),
+    ];
+    foreach ($targets as $u) {
+        @file_get_contents($u);
+    }
+    return true;
+}
+
+/**
+ * Generate or update robots.txt file with proper sitemap reference.
+ */
+function updateRobotsTxt() {
+    $base = getSiteBaseUrl();
+    if ($base === '') return false;
+    $content = "User-agent: *\nAllow: /\n\n";
+    $content .= "Sitemap: " . rtrim($base, '/') . "/sitemap.php\n";
+    @file_put_contents(__DIR__ . '/robots.txt', $content);
+    return true;
+}
+
 function saveArticle($title, $data) {
     if (isDuplicateArticlePayload($title, $data['content'] ?? '')) {
         return false;
@@ -2146,9 +2411,47 @@ function saveArticle($title, $data) {
 
     $pdo = db_connect();
     $slug = generateUniqueSlug($title);
-    $stmt = $pdo->prepare("INSERT INTO articles (title, slug, content, image, excerpt, published_at, category) VALUES (?,?,?,?,?,?,?)");
-    executeStatementWithRetry($stmt, [$title, $slug, $data['content'], $data['image'], $data['excerpt'], date('Y-m-d H:i:s'), 'News']);
+    $nicheId = getActiveNicheId();
+
+    // determine translation if enabled
+    $autoTranslate = getSettingInt('auto_translate_enabled', 0, 0, 1) === 1;
+    $targetLang = trim((string)getSetting('auto_translate_target_language', ''));
+    $translatedTitle = null;
+    $translatedContent = null;
+    $origLanguage = '';
+
+    if ($autoTranslate && $targetLang !== '') {
+        $translatedTitle = translateText($title, $targetLang);
+        $translatedContent = translateText($data['content'] ?? '', $targetLang);
+        $origLanguage = $targetLang;
+    }
+
+    $stmt = $pdo->prepare("INSERT INTO articles (title, slug, content, image, image2, excerpt, published_at, category, niche_id, translated_title, translated_content, orig_language) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)");
+    executeStatementWithRetry($stmt, [
+        $title,
+        $slug,
+        $data['content'],
+        $data['image'] ?? null,
+        $data['image2'] ?? null,
+        $data['excerpt'] ?? null,
+        date('Y-m-d H:i:s'),
+        'News',
+        $nicheId,
+        $translatedTitle,
+        $translatedContent,
+        $origLanguage
+    ]);
     $articleId = (int)$pdo->lastInsertId();
+    
+    // Initialize stats for new article
+    initArticleStats($articleId);
+    
+    // add tags automatically based on title/content
+    $tags = generateAutoTags($title, $data['content'] ?? '');
+    foreach ($tags as $tag) {
+        addTagToArticle($articleId, $tag);
+    }
+
     writeArticleExportFiles($articleId, $slug, [
         'id' => $articleId,
         'title' => $title,
@@ -2156,11 +2459,17 @@ function saveArticle($title, $data) {
         'content' => $data['content'],
         'excerpt' => $data['excerpt'],
         'image' => $data['image'] ?? null,
+        'image2' => $data['image2'] ?? null,
+        'translated_title' => $translatedTitle,
+        'translated_content' => $translatedContent,
         'meta_title' => $data['meta_title'] ?? null,
         'meta_description' => $data['meta_description'] ?? null,
         'focus_keywords' => $data['focus_keywords'] ?? [],
         'published_at' => date('c'),
     ]);
+
+    // kick the search engines to recrawl sitemap
+    pingSearchEngines(getSiteBaseUrl() . '/sitemap.php');
 
     return true;
 }

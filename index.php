@@ -19,6 +19,8 @@ $siteTitle = getSiteTitle();
 $pageTitle = (string)getSetting('seo_home_title', $siteTitle);
 $pageDescription = (string)getSetting('seo_home_description', 'Automotive reviews, guides, and practical car ownership tips.');
 $canonicalUrl = $baseUrl . '/index.php';
+// always include language in canonical links
+$canonicalUrl .= (strpos($canonicalUrl, '?') === false ? '?' : '&') . 'lang=' . urlencode($language);
 $openGraphType = 'website';
 $openGraphImage = null;
 $articleStructuredData = null;
@@ -166,9 +168,11 @@ function buildImageSeoText($primary, $fallback, $suffix) {
 
 $socialImageAltText = buildImageSeoText($pageTitle, $siteTitle, $imageAltSuffix);
 
+$tagFilter = trim((string)($_GET['tag'] ?? ''));
 $isFilteredListing = $slug === '' && (
     trim((string)($_GET['q'] ?? '')) !== ''
     || trim((string)($_GET['category'] ?? '')) !== ''
+    || $tagFilter !== ''
     || trim((string)($_GET['published_from'] ?? '')) !== ''
     || trim((string)($_GET['published_to'] ?? '')) !== ''
     || (int)($_GET['page'] ?? 1) > 1
@@ -180,7 +184,7 @@ if ($isFilteredListing) {
 if ($staticPage !== '') {
     $pageTitle = $staticPages[$staticPage]['title'] . ' | ' . $siteTitle;
     $pageDescription = $staticPages[$staticPage]['description'];
-    $canonicalUrl = $baseUrl . '/index.php?doc=' . rawurlencode($staticPage);
+    $canonicalUrl = $baseUrl . '/index.php?doc=' . rawurlencode($staticPage) . '&lang=' . urlencode($language);
     $openGraphType = 'website';
     if ($defaultSocialImage !== '') {
         $openGraphImage = $defaultSocialImage;
@@ -188,26 +192,39 @@ if ($staticPage !== '') {
 }
 
 if ($slug !== '') {
-    $seoStmt = $pdo->prepare("SELECT id, title, slug, excerpt, content, image, published_at, category FROM articles WHERE slug = ? LIMIT 1");
+    $seoStmt = $pdo->prepare("SELECT id, title, slug, excerpt, content, image, image2, translated_title, translated_content, published_at, category FROM articles WHERE slug = ? LIMIT 1");
     $seoStmt->execute([$slug]);
     $seoArticle = $seoStmt->fetch(PDO::FETCH_ASSOC);
 
     if ($seoArticle) {
-        $pageTitle = $seoArticle['title'] . ' | ' . $articleTitleSuffix;
+        recordArticleView((int)$seoArticle['id']);
+        $displayTitleArticle = (trim((string)($seoArticle['translated_title'] ?? '')) !== '' && $language !== 'en') ? $seoArticle['translated_title'] : $seoArticle['title'];
+        $pageTitle = $displayTitleArticle . ' | ' . $articleTitleSuffix;
         $pageDescription = trim((string)($seoArticle['excerpt'] ?? ''));
         if ($pageDescription === '') {
             $pageDescription = mb_substr(trim(strip_tags((string)($seoArticle['content'] ?? ''))), 0, 160);
         }
         $pageDescription = mb_substr($pageDescription, 0, 160);
-        $canonicalUrl = $baseUrl . '/index.php?slug=' . rawurlencode((string)$seoArticle['slug']);
+        $canonicalUrl = $baseUrl . '/index.php?slug=' . rawurlencode((string)$seoArticle['slug']) . '&lang=' . urlencode($language);
         $openGraphType = 'article';
-        $openGraphImage = trim((string)($seoArticle['image'] ?? '')) ?: ($defaultSocialImage !== '' ? $defaultSocialImage : null);
+
+        $openGraphImages = [];
+        if (trim((string)$seoArticle['image']) !== '') {
+            $openGraphImages[] = $seoArticle['image'];
+        }
+        if (trim((string)$seoArticle['image2']) !== '') {
+            $openGraphImages[] = $seoArticle['image2'];
+        }
+        if (empty($openGraphImages) && $defaultSocialImage !== '') {
+            $openGraphImages[] = $defaultSocialImage;
+        }
+        $openGraphImage = $openGraphImages[0] ?? null;
         $socialImageAltText = buildImageSeoText($seoArticle['title'] ?? '', $siteTitle, $imageAltSuffix);
 
         $articleStructuredData = [
             '@context' => 'https://schema.org',
             '@type' => 'Article',
-            'headline' => $seoArticle['title'],
+            'headline' => $displayTitleArticle,
             'description' => $pageDescription,
             'author' => [
                 '@type' => 'Organization',
@@ -223,8 +240,27 @@ if ($slug !== '') {
             'url' => $canonicalUrl,
         ];
 
-        if ($openGraphImage) {
-            $articleStructuredData['image'] = [$openGraphImage];
+        // add language and keywords
+        $articleStructuredData['inLanguage'] = $language;
+        $tagList = getArticleTags((int)$seoArticle['id']);
+        $keywordsArr = [];
+        if (!empty($tagList)) {
+            foreach ($tagList as $t) $keywordsArr[] = $t['name'];
+        }
+        if (trim((string)$seoArticle['category']) !== '') {
+            $keywordsArr[] = $seoArticle['category'];
+        }
+        if (!empty($keywordsArr)) {
+            $articleStructuredData['keywords'] = implode(', ', $keywordsArr);
+        }
+
+        // add images and publisher logo if available
+        if ($openGraphImages) {
+            $articleStructuredData['image'] = $openGraphImages;
+            $articleStructuredData['publisher']['logo'] = [
+                '@type' => 'ImageObject',
+                'url' => $openGraphImages[0],
+            ];
         }
 
         $breadcrumbStructuredData = [
@@ -240,7 +276,7 @@ if ($slug !== '') {
                 [
                     '@type' => 'ListItem',
                     'position' => 2,
-                    'name' => (string)$seoArticle['title'],
+                    'name' => (string)$displayTitleArticle,
                     'item' => $canonicalUrl,
                 ],
             ],
@@ -306,8 +342,20 @@ if ($slug === '' && $staticPage === '') {
     <meta property="og:description" content="<?= e($pageDescription) ?>">
     <meta property="og:type" content="<?= e($openGraphType) ?>">
     <meta property="og:url" content="<?= e($canonicalUrl) ?>">
-    <?php if ($openGraphImage): ?>
-        <meta property="og:image" content="<?= e($openGraphImage) ?>">
+    <?php if ($openGraphType === 'article' && isset($articleStructuredData['datePublished'])): ?>
+        <meta property="article:published_time" content="<?= e($articleStructuredData['datePublished']) ?>">
+        <meta property="article:modified_time" content="<?= e($articleStructuredData['dateModified']) ?>">
+        <?php if (!empty($seoArticle['category'])): ?>
+            <meta property="article:section" content="<?= e($seoArticle['category']) ?>">
+        <?php endif; ?>
+    <?php endif; ?>
+    <?php if (!empty($articleStructuredData['keywords'])): ?>
+        <meta name="keywords" content="<?= e($articleStructuredData['keywords']) ?>">
+    <?php endif; ?>
+    <?php if (!empty($openGraphImages)): ?>
+        <?php foreach ($openGraphImages as $ogImg): ?>
+            <meta property="og:image" content="<?= e($ogImg) ?>">
+        <?php endforeach; ?>
         <meta property="og:image:alt" content="<?= e($socialImageAltText) ?>">
     <?php endif; ?>
     <meta name="twitter:card" content="summary_large_image">
@@ -1062,7 +1110,8 @@ $baseQuery['per_page'] = $perPage;
         <article class="article-content bg-white p-4 rounded shadow-sm">
             <header class="article-header-panel">
                 <span class="article-kicker">Featured read</span>
-                <h1 class="article-title"><?= e($art['title']) ?></h1>
+                <?php $displayTitleArticle = (trim((string)($art['translated_title'] ?? '')) !== '' && $language !== 'en') ? $art['translated_title'] : $art['title']; ?>
+                <h1 class="article-title"><?= e($displayTitleArticle) ?></h1>
                 <?php if (trim((string)($art['excerpt'] ?? '')) !== ''): ?>
                     <p class="article-excerpt"><?= e($art['excerpt']) ?></p>
                 <?php endif; ?>
@@ -1071,10 +1120,77 @@ $baseQuery['per_page'] = $perPage;
                     <span class="meta-pill">📅 <?= e($art['published_at']) ?></span>
                     <span class="meta-pill">⏱ <?= estimateReadingTime($art['content']) ?> min read</span>
                 </div>
+                
+                <?php
+                $stats = getArticleStats((int)($art['id'] ?? 0));
+                $tags = getArticleTags((int)($art['id'] ?? 0));
+                ?>
+                
+                <?php if (!empty($tags)): ?>
+                    <div class="mt-2 d-flex flex-wrap gap-1">
+                        <?php foreach ($tags as $tag): ?>
+                            <a href="?tag=<?= e($tag['slug']) ?>" class="badge bg-info"><?= e($tag['name']) ?></a>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
+                
+                <div class="mt-3 d-flex flex-wrap gap-3 text-muted small">
+                    <div><i class="bi bi-eye"></i> <strong><?= (int)($stats['views'] ?? 0) ?></strong> views</div>
+                    <?php if ((int)($stats['avg_rating'] ?? 0) > 0): ?>
+                        <div>
+                            <i class="bi bi-star-fill text-warning"></i> 
+                            <strong><?= round($stats['avg_rating'], 1) ?></strong> / 5 
+                            <small>(<?= (int)($stats['rating_count'] ?? 0) ?> votes)</small>
+                        </div>
+                    <?php endif; ?>
+                </div>
             </header>
             <?php $heroImage = trim((string)($art['image'] ?? '')) !== '' ? $art['image'] : buildFreeArticleImageUrl($art['title'] ?? $art['slug']); ?>
             <img src="<?= e($heroImage) ?>" alt="<?= e(buildImageSeoText($art['title'] ?? '', $art['slug'] ?? '', $imageAltSuffix)) ?>" title="<?= e(buildImageSeoText($art['title'] ?? '', $art['slug'] ?? '', $imageTitleSuffix)) ?>" class="img-fluid rounded mb-3" loading="eager" decoding="async" fetchpriority="high">
             <?= $articleContentWithAds ?>
+            <?php if (trim((string)($art['image2'] ?? '')) !== ''): ?>
+                <img src="<?= e($art['image2']) ?>" alt="<?= e(buildImageSeoText($art['title'] ?? '', $art['slug'] ?? '', $imageAltSuffix)) ?>" title="<?= e(buildImageSeoText($art['title'] ?? '', $art['slug'] ?? '', $imageTitleSuffix)) ?>" class="img-fluid rounded mb-3">
+            <?php endif; ?>
+            <?php if (trim((string)($art['translated_content'] ?? '')) !== ''): ?>
+                <hr class="my-4">
+                <section class="translated-content">
+                    <h4>Translated version</h4>
+                    <div><?= nl2br(e($art['translated_content'])) ?></div>
+                </section>
+            <?php endif; ?>
+            
+            <hr class="my-4">
+            
+            <section class="article-rating mt-4 p-3 bg-light rounded">
+                <h5 class="mb-3">Rate this article</h5>
+                <div class="d-flex gap-2 align-items-center">
+                    <div id="rating-stars" class="d-flex gap-1">
+                        <?php for ($i = 1; $i <= 5; $i++): ?>
+                            <button type="button" class="btn btn-sm btn-outline-warning rating-star" data-rating="<?= $i ?>" title="Rate <?= $i ?> stars">
+                                <i class="bi bi-star"></i>
+                            </button>
+                        <?php endfor; ?>
+                    </div>
+                    <small class="text-muted" id="rating-message">Click to rate</small>
+                </div>
+                <script>
+                    document.querySelectorAll('.rating-star').forEach(btn => {
+                        btn.addEventListener('click', function() {
+                            const rating = this.dataset.rating;
+                            const articleId = <?= (int)($art['id'] ?? 0) ?>;
+                            
+                            fetch('api.php?endpoint=rate_article', {
+                                method: 'POST',
+                                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                                body: 'article_id=' + articleId + '&rating=' + rating
+                            }).then(r => r.json()).then(d => {
+                                document.getElementById('rating-message').textContent = 
+                                    d.ok ? 'Thanks for rating!' : 'Error - please try again';
+                            });
+                        });
+                    });
+                </script>
+            </section>
         </article>
 
         <?php
@@ -1120,8 +1236,57 @@ $baseQuery['per_page'] = $perPage;
     <?php endif; ?>
 
     <?php
+    // Show trending articles on homepage
+    if ($slug === '' && $search === '' && $category === '' && $page === 1) {
+        $trending = getTrendingArticles(6);
+        if (!empty($trending)): ?>
+            <section class="mb-4 p-4 rounded-4 bg-info bg-opacity-10 border border-info border-opacity-25">
+                <h2 class="h5 mb-3"><i class="bi bi-fire"></i> Trending Now</h2>
+                <div class="row row-cols-1 row-cols-md-3 g-2">
+                    <?php foreach (array_slice($trending, 0, 3) as $t): ?>
+                        <?php $ttitle = (trim((string)($t['translated_title'] ?? '')) !== '' && $language !== 'en') ? $t['translated_title'] : $t['title']; ?>
+                        <div class="col">
+                            <a href="?slug=<?= e($t['slug']) ?>" class="card h-100 text-decoration-none shadow-sm">
+                                <div class="card-body">
+                                    <h6 class="card-title mb-1"><?= e(mb_substr($ttitle, 0, 45)) ?>...</h6>
+                                    <small class="text-muted">
+                                        <i class="bi bi-eye"></i> <?= (int)($t['views'] ?? 0) ?> views
+                                        <?php if ((int)($t['avg_rating'] ?? 0) > 0): ?>
+                                            <span class="text-warning"><i class="bi bi-star-fill"></i> <?= round($t['avg_rating'], 1) ?></span>
+                                        <?php endif; ?>
+                                    </small>
+                                </div>
+                            </a>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            </section>
+        <?php endif;
+    }
+    ?>
+
+    <?php if ($categories): ?>
+        <div class="quick-categories mb-4">
+            <?php $allQuery = array_merge($baseQuery, ['category' => '', 'page' => 1]); ?>
+            <a class="<?= $category === '' ? 'active' : '' ?>" href="index.php?<?= e(http_build_query($allQuery)) ?>">All</a>
+            <?php foreach (array_slice($categories, 0, 8) as $categoryChip): ?>
+                <?php $chipQuery = array_merge($baseQuery, ['category' => $categoryChip, 'page' => 1]); ?>
+                <a class="<?= $category === $categoryChip ? 'active' : '' ?>" href="index.php?<?= e(http_build_query($chipQuery)) ?>"><?= e($categoryChip) ?></a>
+            <?php endforeach; ?>
+        </div>
+    <?php endif; ?>
+
+    <?php
     $clauses = [];
     $params = [];
+    
+    // Add niche filter (always include active niche for now, can be toggled later)
+    $activeNiche = getActiveNicheId();
+    if ($activeNiche > 0) {
+        $clauses[] = "niche_id = :niche_id";
+        $params['niche_id'] = $activeNiche;
+    }
+    
     if ($search !== '') {
         $clauses[] = "(title LIKE :search OR excerpt LIKE :search OR content LIKE :search)";
         $params['search'] = '%' . $search . '%';
@@ -1140,7 +1305,12 @@ $baseQuery['per_page'] = $perPage;
     }
     $where = $clauses ? ('WHERE ' . implode(' AND ', $clauses)) : '';
 
-    $countStmt = $pdo->prepare("SELECT COUNT(*) FROM articles $where");
+    $countSql = "SELECT COUNT(*) FROM articles $where";
+    // if tag filter used, count via subquery join to ensure correct total
+    if (isset($tagFilter) && $tagFilter !== '') {
+        $countSql = "SELECT COUNT(DISTINCT a.id) FROM articles a WHERE " . implode(' AND ', array_map(function($c){ return $c; }, $clauses));
+    }
+    $countStmt = $pdo->prepare($countSql);
     $countStmt->execute($params);
     $total = (int)$countStmt->fetchColumn();
 
@@ -1153,7 +1323,7 @@ $baseQuery['per_page'] = $perPage;
         $orderBy = '(CASE WHEN title LIKE :search_exact THEN 100 ELSE 0 END + CASE WHEN excerpt LIKE :search_exact THEN 45 ELSE 0 END + CASE WHEN content LIKE :search_exact THEN 25 ELSE 0 END + CASE WHEN title LIKE :search THEN 20 ELSE 0 END + CASE WHEN excerpt LIKE :search THEN 10 ELSE 0 END) DESC, id DESC';
     }
 
-    $sql = "SELECT id, title, slug, excerpt, image, category, published_at, MAX(1, CAST(ROUND(((LENGTH(content) - LENGTH(REPLACE(content, ' ', '')) + 1) / 200.0)) AS INTEGER)) AS reading_minutes FROM articles $where ORDER BY $orderBy LIMIT :limit OFFSET :offset";
+    $sql = "SELECT id, title, slug, excerpt, image, image2, translated_title, category, published_at, MAX(1, CAST(ROUND(((LENGTH(content) - LENGTH(REPLACE(content, ' ', '')) + 1) / 200.0)) AS INTEGER)) AS reading_minutes FROM articles $where ORDER BY $orderBy LIMIT :limit OFFSET :offset";
     $stmt = $pdo->prepare($sql);
     if ($search !== '') {
         $stmt->bindValue(':search', '%' . $search . '%', PDO::PARAM_STR);
@@ -1163,6 +1333,9 @@ $baseQuery['per_page'] = $perPage;
     }
     if ($category !== '') {
         $stmt->bindValue(':category', $category, PDO::PARAM_STR);
+    }
+    if (isset($tagFilter) && $tagFilter !== '') {
+        $stmt->bindValue(':tag', $tagFilter, PDO::PARAM_STR);
     }
     if ($publishedFrom !== '') {
         $stmt->bindValue(':published_from', $publishedFrom, PDO::PARAM_STR);
@@ -1231,10 +1404,11 @@ $baseQuery['per_page'] = $perPage;
     <?php elseif ($view === 'list'): ?>
         <div class="list-group shadow-sm">
             <?php foreach ($articles as $index => $row): ?>
+                <?php $displayTitle = (trim((string)($row['translated_title'] ?? '')) !== '' && $language !== 'en') ? $row['translated_title'] : $row['title']; ?>
                 <?php $articleQuery = array_merge($baseQuery, ['slug' => $row['slug']]); ?>
                 <a href="?<?= e(http_build_query($articleQuery)) ?>" class="list-group-item list-group-item-action py-3">
                     <div class="d-flex w-100 justify-content-between">
-                        <h3 class="h5 mb-1"><?= e($row['title']) ?></h3>
+                        <h3 class="h5 mb-1"><?= e($displayTitle) ?></h3>
                         <small class="text-muted"><?= (int)($row['reading_minutes'] ?? 1) ?> min</small>
                     </div>
                     <p class="mb-1 text-muted"><?= e($row['excerpt']) ?></p>
@@ -1249,12 +1423,21 @@ $baseQuery['per_page'] = $perPage;
         </div>
         <div class="row row-cols-1 row-cols-md-3 g-4">
             <?php foreach ($articles as $index => $row): ?>
-                <?php $cardImage = trim((string)($row['image'] ?? '')) !== '' ? $row['image'] : buildFreeArticleImageUrl($row['title'] ?? $row['slug']); ?>
-                <div class="col">
-                    <div class="card h-100 shadow-sm">
-                        <img src="<?= e($cardImage) ?>" class="card-img-top" style="height:200px;object-fit:cover" alt="<?= e(buildImageSeoText($row['title'] ?? '', $row['slug'] ?? '', $imageAltSuffix)) ?>" title="<?= e(buildImageSeoText($row['title'] ?? '', $row['slug'] ?? '', $imageTitleSuffix)) ?>" loading="<?= $index === 0 ? 'eager' : 'lazy' ?>" fetchpriority="<?= $index === 0 ? 'high' : 'low' ?>" decoding="async">
-                        <div class="card-body d-flex flex-column">
-                            <h3 class="card-title h5 mb-0"><?= e($row['title']) ?></h3>
+                        <?php $displayTitle = (trim((string)($row['translated_title'] ?? '')) !== '' && $language !== 'en') ? $row['translated_title'] : $row['title']; ?>
+                        <?php 
+                            if (trim((string)($row['image'] ?? '')) !== '') {
+                                $cardImage = $row['image'];
+                            } elseif (trim((string)($row['image2'] ?? '')) !== '') {
+                                $cardImage = $row['image2'];
+                            } else {
+                                $cardImage = buildFreeArticleImageUrl($row['title'] ?? $row['slug']);
+                            }
+                        ?>
+                        <div class="col">
+                            <div class="card h-100 shadow-sm">
+                                <img src="<?= e($cardImage) ?>" class="card-img-top" style="height:200px;object-fit:cover" alt="<?= e(buildImageSeoText($displayTitle, $row['slug'] ?? '', $imageAltSuffix)) ?>" title="<?= e(buildImageSeoText($displayTitle, $row['slug'] ?? '', $imageTitleSuffix)) ?>" loading="<?= $index === 0 ? 'eager' : 'lazy' ?>" fetchpriority="<?= $index === 0 ? 'high' : 'low' ?>" decoding="async">
+                                <div class="card-body d-flex flex-column">
+                                    <h3 class="card-title h5 mb-0\><?= e($displayTitle) ?></h3>
                             <p class="card-text text-muted"><?= e($row['excerpt']) ?></p>
                             <div class="d-flex flex-wrap gap-2 mb-3">
                                 <span class="meta-pill">📅 <?= e($row['published_at']) ?></span>

@@ -22,6 +22,20 @@ if ($apiLockEnabled) {
 
 $endpoint = $_GET['endpoint'] ?? 'articles';
 
+if ($endpoint === 'rate_article') {
+    $articleId = (int)($_POST['article_id'] ?? $_GET['article_id'] ?? 0);
+    $rating = (int)($_POST['rating'] ?? $_GET['rating'] ?? 0);
+    
+    if ($articleId > 0 && $rating >= 1 && $rating <= 5) {
+        $success = rateArticle($articleId, $rating, getVisitorFingerprint());
+        echo json_encode(['ok' => $success], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+    } else {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Invalid parameters'], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+}
+
 if ($endpoint === 'stats') {
     $totalArticles = (int)$pdo->query("SELECT COUNT(*) FROM articles")->fetchColumn();
     $totalSources = (int)$pdo->query("SELECT COUNT(*) FROM rss_sources")->fetchColumn();
@@ -49,7 +63,7 @@ if ($endpoint === 'article') {
         exit;
     }
 
-    $stmt = $pdo->prepare("SELECT id, title, slug, excerpt, content, image, category, published_at FROM articles WHERE slug = ? LIMIT 1");
+    $stmt = $pdo->prepare("SELECT id, title, slug, excerpt, content, image, image2, translated_title, translated_content, orig_language, category, published_at FROM articles WHERE slug = ? LIMIT 1");
     $stmt->execute([$slug]);
     $article = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -122,7 +136,7 @@ if ($sort === 'relevance' && $q !== '') {
     $orderBy = '(CASE WHEN title LIKE :q_exact THEN 100 ELSE 0 END + CASE WHEN excerpt LIKE :q_exact THEN 45 ELSE 0 END + CASE WHEN content LIKE :q_exact THEN 25 ELSE 0 END + CASE WHEN title LIKE :q THEN 20 ELSE 0 END + CASE WHEN excerpt LIKE :q THEN 10 ELSE 0 END) DESC, id DESC';
 }
 
-$stmt = $pdo->prepare("SELECT id, title, slug, excerpt, image, category, published_at, content FROM articles $where ORDER BY $orderBy LIMIT :limit OFFSET :offset");
+$stmt = $pdo->prepare("SELECT id, title, slug, excerpt, image, image2, translated_title, translated_content, category, published_at, content FROM articles $where ORDER BY $orderBy LIMIT :limit OFFSET :offset");
 if ($q !== '') {
     $stmt->bindValue(':q', '%' . $q . '%', PDO::PARAM_STR);
     if ($sort === 'relevance') {
