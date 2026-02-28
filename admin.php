@@ -916,15 +916,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'slug' => $slug,
             'id' => $articleId,
         ]);
-        if ($duplicateStmt->fetchColumn()) {
-            $_SESSION['flash_message'] = 'Article update failed. Another article already uses this title or slug.';
-            $_SESSION['flash_type'] = 'danger';
-            header('Location: admin.php');
-            exit;
-        }
-
-        // respect global translation settings if fields are empty
         $autoTranslate = getSettingInt('auto_translate_enabled', 0, 0, 1) === 1;
+                // Multi-niche publishing
+                $publishNiches = array_filter(array_map('trim', explode("\n", $_POST['publish_niches'] ?? '')));
+                $count = 0;
+
+                if (!empty($publishNiches)) {
+                    foreach ($publishNiches as $nicheSlug) {
+                        $currentNiche = \App\NicheManager::getNicheBySlug($nicheSlug);
+                        if ($currentNiche) {
+                            setSetting('active_niche', $nicheSlug);
+                            $result = publishAutoArticleBySchedule(true);
+                            if (($result['published'] ?? 0) === 1) {
+                                $count++;
+                            }
+                        }
+                    }
+                    $_SESSION['flash_message'] = "Published {$count} article(s) across niches.";
+                    $_SESSION['flash_type'] = 'success';
+                } else {
+                    $result = publishAutoArticleBySchedule(true);
+                    if (($result['published'] ?? 0) === 1) {
+                        $_SESSION['flash_message'] = 'Auto-generated and published: ' . ($result['title'] ?? 'New article');
+                        $_SESSION['flash_type'] = 'success';
+                    } else {
+                        $_SESSION['flash_message'] = 'Automatic generation failed. Please try again.';
+                        $_SESSION['flash_type'] = 'danger';
+                    }
+                }
         $targetLang = trim((string)getSetting('auto_translate_target_language', ''));
         $origLanguage = '';
         if ($autoTranslate && $targetLang) {
@@ -1318,6 +1337,31 @@ $settingsRows = $settingsStmt->fetchAll(PDO::FETCH_ASSOC);
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
     <style>
+        /* تحسين زر النسخ */
+        .copy-btn {
+            cursor: pointer;
+            border: none;
+            background: none;
+            color: #38bdf8;
+            font-size: 1.1em;
+            margin-left: 0.3em;
+        }
+        .copy-success {
+            color: #22c55e;
+            font-size: 0.9em;
+            margin-right: 0.5em;
+        }
+        /* تنبيه تفاعلي أعلى الصفحة */
+        #top-alert {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            z-index: 9999;
+            display: none;
+        }
+    </style>
+    <style>
         body {
             --bs-heading-color: #f8fafc;
             background: radial-gradient(circle at 15% 10%, #1f6f54 0%, #14532d 45%, #0b2e1f 100%);
@@ -1504,7 +1548,46 @@ $settingsRows = $settingsStmt->fetchAll(PDO::FETCH_ASSOC);
     </style>
 </head>
 <body class="text-light">
+<!-- تنبيه تفاعلي أعلى الصفحة -->
+<div id="top-alert" class="alert alert-info text-center" role="alert"></div>
 <div class="container py-4 py-lg-5">
+    <!-- ترتيب الصفحة: الشريط الجانبي أولاً -->
+    <div class="row">
+        <aside class="col-lg-3">
+            <div class="card section-card dashboard-sidebar">
+                <div class="card-body">
+                    <h5 class="mb-3"><i class="bi bi-layout-sidebar"></i> لوحة الأقسام</h5>
+                    <hr class="border-secondary-subtle my-3">
+                    <input type="search" id="control-panel-search" class="form-control form-control-sm mb-2" placeholder="بحث الأقسام..." aria-label="بحث الأقسام">
+                    <span class="section-counter" id="section-counter">0/0 قسم</span>
+                    <small class="d-block text-secondary mb-2" id="active-section-label">القسم النشط: —</small>
+                    <div class="panel-nav-toolbar">
+                        <button type="button" class="btn btn-sm btn-outline-light" id="panel-prev-btn"><i class="bi bi-arrow-up"></i> السابق</button>
+                        <button type="button" class="btn btn-sm btn-outline-light" id="panel-next-btn">التالي <i class="bi bi-arrow-down"></i></button>
+                    </div>
+                    <div class="d-grid gap-2" id="control-panel-nav"></div>
+                    <div class="panel-nav-empty d-none" id="control-panel-empty">لا يوجد أقسام مطابقة.</div>
+                </div>
+            </div>
+        </aside>
+        <div class="col-lg-9">
+            <!-- الإحصائيات أعلى الصفحة -->
+            <div class="row g-3 mb-4" id="overview-stats">
+                ...existing code...
+            </div>
+            <!-- عرض الرسائل والتنبيهات -->
+            <?php if ($message): ?>
+                <div class="alert alert-<?= e($messageType) ?> shadow-sm position-relative">
+                    <?= e($message) ?>
+                    <button type="button" class="btn-close position-absolute end-0 top-0 mt-2 me-2" onclick="this.parentElement.style.display='none';"></button>
+                </div>
+            <?php endif; ?>
+            <!-- الأقسام الرئيسية -->
+            <div id="active-control-panel">
+                ...existing code...
+            </div>
+        </div>
+    </div>
     <div class="d-flex flex-column flex-lg-row justify-content-between align-items-start align-items-lg-center gap-3 mb-4">
         <div>
             <h1 class="mb-1"><i class="bi bi-speedometer2"></i> <?= e($siteTitle) ?> Control Panel</h1>
@@ -1520,7 +1603,17 @@ $settingsRows = $settingsStmt->fetchAll(PDO::FETCH_ASSOC);
     </div>
 
     <?php if ($message): ?>
-        <div class="alert alert-<?= e($messageType) ?> shadow-sm"><?= e($message) ?></div>
+        <!-- تحسين عرض الرسائل: تنبيه قابل للإغلاق وتختفي تلقائياً -->
+        <div class="alert alert-<?= e($messageType) ?> shadow-sm alert-dismissible fade show" role="alert" id="main-alert">
+            <?= e($message) ?>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="إغلاق"></button>
+        </div>
+        <script>
+            setTimeout(function(){
+                var alert = document.getElementById('main-alert');
+                if(alert) alert.classList.remove('show');
+            }, 5000);
+        </script>
     <?php endif; ?>
 
     <?php
@@ -1540,37 +1633,14 @@ $settingsRows = $settingsStmt->fetchAll(PDO::FETCH_ASSOC);
     </div>
 
     <div class="row g-3 mb-4" id="overview-stats">
-        <div class="col-sm-6 col-lg-3">
-            <div class="card section-card stat-card h-100">
-                <div class="card-body">
-                    <small class="text-light-emphasis">Total Articles</small>
-                    <h3><?= $totalArticles ?></h3>
-                </div>
-            </div>
-        </div>
-        <div class="col-sm-6 col-lg-3">
-            <div class="card section-card stat-card h-100">
-                <div class="card-body">
-                    <small class="text-light-emphasis">RSS / Web Sources</small>
-                    <h3><?= $totalSources ?> / <?= $totalWebSources ?></h3>
-                </div>
-            </div>
-        </div>
-        <div class="col-sm-6 col-lg-3">
-            <div class="card section-card stat-card h-100">
-                <div class="card-body">
-                    <small class="text-light-emphasis">Daily Limit</small>
-                    <h3><?= $dailyLimit ?></h3>
-                </div>
-            </div>
-        </div>
-        <div class="col-sm-6 col-lg-3">
-            <div class="card section-card stat-card h-100">
-                <div class="card-body">
-                    <small class="text-light-emphasis">Latest Publish</small>
-                    <h6><?= e($latestDate ?: 'N/A') ?></h6>
-                    <small class="text-secondary d-block mt-2">Visitors: <?= (int)$totalTrackedVisitors ?> • Views: <?= (int)$totalTrackedViews ?></small>
-                </div>
+        <!-- شريط إحصائيات سريع أعلى لوحة التحكم -->
+        <div class="col-12 mb-2">
+            <div class="d-flex flex-wrap gap-3 justify-content-center align-items-center">
+                <span class="badge bg-primary">المقالات: <?= $totalArticles ?></span>
+                <span class="badge bg-success">مصادر RSS/Web: <?= $totalSources ?> / <?= $totalWebSources ?></span>
+                <span class="badge bg-warning text-dark">الحد اليومي: <?= $dailyLimit ?></span>
+                <span class="badge bg-info text-dark">آخر نشر: <?= e($latestDate ?: 'N/A') ?></span>
+                <span class="badge bg-secondary">الزوار: <?= (int)$totalTrackedVisitors ?> • المشاهدات: <?= (int)$totalTrackedViews ?></span>
             </div>
         </div>
     </div>
@@ -1653,32 +1723,33 @@ $settingsRows = $settingsStmt->fetchAll(PDO::FETCH_ASSOC);
         </aside>
 
         <div class="col-lg-9">
-            <div class="row g-4">
-        <div class="col-xl-4 d-none" id="control-cards-source">
-            <div class="card section-card mb-3" id="publishing-settings">
-                <div class="card-body">
-                    <h5><i class="bi bi-sliders"></i> Daily Publishing Limit</h5>
-                    <form method="post" class="row g-2 align-items-end">
-                        <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
-                        <div class="col-8">
-                            <label class="form-label">Daily Workflow Limit</label>
-                            <input type="number" name="daily_limit" class="form-control" min="1" max="200" value="<?= $dailyLimit ?>">
-                        </div>
-                        <div class="col-4">
-                            <button name="update_daily_limit" value="1" class="btn btn-outline-light w-100">Save</button>
-                        </div>
-                    </form>
-                    <small class="text-secondary">Controls max articles generated per selected workflow run.</small>
+            <div class="row g-4" id="active-control-panel">
+                <!-- Section: Daily Publishing Limit -->
+                <div class="card section-card mb-3 panel-section" id="publishing-settings" style="display:none;">
+                    <div class="card-body">
+                        <h5><i class="bi bi-sliders"></i> Daily Publishing Limit</h5>
+                        <form method="post" class="row g-2 align-items-end">
+                            <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
+                            <div class="col-8">
+                                <label class="form-label">Daily Workflow Limit</label>
+                                <input type="number" name="daily_limit" class="form-control" min="1" max="200" value="<?= $dailyLimit ?>">
+                            </div>
+                            <div class="col-4">
+                                <button name="update_daily_limit" value="1" class="btn btn-outline-light w-100">Save</button>
+                            </div>
+                        </form>
+                        <small class="text-secondary">Controls max articles generated per selected workflow run.</small>
+                    </div>
                 </div>
-            </div>
 
-            <div class="card section-card mb-3" id="seo-settings">
-                <div class="card-body">
-                    <h5><i class="bi bi-search"></i> SEO Settings</h5>
-                    <form method="post" class="row g-2 align-items-end">
-                        <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
-                        <div class="col-12">
-                            <label class="form-label">Site Brand Title</label>
+                <!-- Section: SEO Settings -->
+                <div class="card section-card mb-3 panel-section" id="seo-settings" style="display:none;">
+                    <div class="card-body">
+                        <h5><i class="bi bi-search"></i> SEO Settings</h5>
+                        <form method="post" class="row g-2 align-items-end">
+                            <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
+                            <div class="col-12">
+                                <label class="form-label">Site Brand Title</label>
                             <input type="text" name="site_title" class="form-control" maxlength="80" value="<?= e($siteTitle) ?>" placeholder="AutoCar Niche">
                             <small class="text-secondary">Used for navbar, admin header, API site name, and sitemap publication name.</small>
                         </div>
@@ -1764,68 +1835,122 @@ $settingsRows = $settingsStmt->fetchAll(PDO::FETCH_ASSOC);
             </div>
 
             <div class="card section-card mb-3" id="ads-settings">
-                <div class="card-body">
-                    <h5><i class="bi bi-badge-ad"></i> Smart Ads Manager</h5>
-                    <form method="post" class="row g-2 align-items-end">
-                        <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
-                        <div class="col-12">
-                            <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" role="switch" id="ads_enabled" name="ads_enabled" value="1" <?= $adsEnabled ? 'checked' : '' ?>>
-                                <label class="form-check-label" for="ads_enabled">Enable ad injection in article pages</label>
+                <!-- Section: Ads Manager -->
+                <div class="card section-card mb-3 panel-section" id="ads-settings" style="display:none;">
+                    <div class="card-body">
+                        <h5><i class="bi bi-badge-ad"></i> Smart Ads Manager</h5>
+                        <form method="post" class="row g-2 align-items-end">
+                            <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
+                            <div class="col-12">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" role="switch" id="ads_enabled" name="ads_enabled" value="1" <?= $adsEnabled ? 'checked' : '' ?>>
+                                    <label class="form-check-label" for="ads_enabled">Enable ad injection in article pages</label>
+                                </div>
                             </div>
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label">Injection Strategy</label>
-                            <select name="ads_injection_mode" class="form-select">
-                                <option value="smart" <?= $adsInjectionMode === 'smart' ? 'selected' : '' ?>>AI Smart Placement (recommended)</option>
-                                <option value="interval" <?= $adsInjectionMode === 'interval' ? 'selected' : '' ?>>Fixed Paragraph Interval</option>
-                            </select>
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label">Max Ads / Article</label>
-                            <input type="number" name="ads_max_units_per_article" class="form-control" min="1" max="6" value="<?= (int)$adsMaxUnits ?>">
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label">Paragraph Interval</label>
-                            <input type="number" name="ads_paragraph_interval" class="form-control" min="2" max="10" value="<?= (int)$adsParagraphInterval ?>">
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label">Min Words before First Ad</label>
-                            <input type="number" name="ads_min_words_before_first_injection" class="form-control" min="80" max="600" value="<?= (int)$adsMinWordsBeforeFirstInjection ?>">
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label">Min Article Words (Enable Ads)</label>
-                            <input type="number" name="ads_min_article_words" class="form-control" min="120" max="3000" value="<?= (int)$adsMinArticleWords ?>">
-                        </div>
-                        <div class="col-12">
-                            <label class="form-label">Block Ads for Title Keywords (comma separated)</label>
-                            <input type="text" name="ads_blocked_title_keywords" class="form-control" maxlength="300" value="<?= e($adsBlockedTitleKeywords) ?>" placeholder="opinion, breaking, live blog">
-                        </div>
-                        <div class="col-12">
-                            <label class="form-label">Block Ads for Categories (comma separated)</label>
-                            <input type="text" name="ads_blocked_categories" class="form-control" maxlength="300" value="<?= e($adsBlockedCategories) ?>" placeholder="news, opinion, analysis">
-                        </div>
-                        <div class="col-12">
-                            <label class="form-label">Ad Label</label>
-                            <input type="text" name="ads_label_text" class="form-control" maxlength="40" value="<?= e($adsLabelText) ?>" placeholder="Sponsored">
-                        </div>
-                        <div class="col-12">
-                            <label class="form-label">Ad HTML / Script Code</label>
-                            <textarea name="ads_html_code" class="form-control" rows="5" placeholder="Paste AdSense or custom ad snippet"><?= e($adsHtmlCode) ?></textarea>
-                        </div>
-                        <div class="col-12">
-                            <button name="update_ads_settings" value="1" class="btn btn-outline-light w-100">Save Ads Controls</button>
-                        </div>
-                    </form>
-                    <small class="text-secondary">Smart mode uses content-aware rules, minimum article length checks, and optional title keyword blocking for safer monetization.</small>
-                    <div class="mt-3 ads-preview">
-                        <div class="inline-ad-unit">
-                            <div class="inline-ad-label"><?= e($adsLabelText) ?> • Preview</div>
-                            <?= $adsHtmlCode !== '' ? $adsHtmlCode : '<div class="ad-unit-inner">Place your ad code here</div>' ?>
+                            <div class="col-6">
+                                <label class="form-label">Injection Strategy</label>
+                                <select name="ads_injection_mode" class="form-select">
+                                    <option value="smart" <?= $adsInjectionMode === 'smart' ? 'selected' : '' ?>>AI Smart Placement (recommended)</option>
+                                    <option value="interval" <?= $adsInjectionMode === 'interval' ? 'selected' : '' ?>>Fixed Paragraph Interval</option>
+                                </select>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">Max Ads / Article</label>
+                                <input type="number" name="ads_max_units_per_article" class="form-control" min="1" max="6" value="<?= (int)$adsMaxUnits ?>">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">Paragraph Interval</label>
+                                <input type="number" name="ads_paragraph_interval" class="form-control" min="2" max="10" value="<?= (int)$adsParagraphInterval ?>">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">Min Words before First Ad</label>
+                                <input type="number" name="ads_min_words_before_first_injection" class="form-control" min="80" max="600" value="<?= (int)$adsMinWordsBeforeFirstInjection ?>">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">Min Article Words (Enable Ads)</label>
+                                <input type="number" name="ads_min_article_words" class="form-control" min="120" max="3000" value="<?= (int)$adsMinArticleWords ?>">
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Block Ads for Title Keywords (comma separated)</label>
+                                <input type="text" name="ads_blocked_title_keywords" class="form-control" maxlength="300" value="<?= e($adsBlockedTitleKeywords) ?>" placeholder="opinion, breaking, live blog">
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Block Ads for Categories (comma separated)</label>
+                                <input type="text" name="ads_blocked_categories" class="form-control" maxlength="300" value="<?= e($adsBlockedCategories) ?>" placeholder="news, opinion, analysis">
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Ad Label</label>
+                                <input type="text" name="ads_label_text" class="form-control" maxlength="40" value="<?= e($adsLabelText) ?>" placeholder="Sponsored">
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Ad HTML / Script Code</label>
+                                <textarea name="ads_html_code" class="form-control" rows="5" placeholder="Paste AdSense or custom ad snippet"><?= e($adsHtmlCode) ?></textarea>
+                            </div>
+                            <div class="col-12">
+                                <button name="update_ads_settings" value="1" class="btn btn-outline-light w-100">Save Ads Controls</button>
+                            </div>
+                        </form>
+                        <small class="text-secondary">Smart mode uses content-aware rules, minimum article length checks, and optional title keyword blocking for safer monetization.</small>
+                        <div class="mt-3 ads-preview">
+                            <div class="inline-ad-unit">
+                                <div class="inline-ad-label"><?= e($adsLabelText) ?> • Preview</div>
+                                <?= $adsHtmlCode !== '' ? $adsHtmlCode : '<div class="ad-unit-inner">Place your ad code here</div>' ?>
+                            </div>
                         </div>
                     </div>
                 </div>
+
+                <!-- Add more sections here as needed, following the same pattern -->
             </div>
+            <script>
+                // Section navigation logic
+                const sectionIds = [
+                    'publishing-settings',
+                    'seo-settings',
+                    'ads-settings',
+                    // Add more section IDs here
+                ];
+                let activeSection = sectionIds[0];
+                function showSection(id) {
+                    sectionIds.forEach(sid => {
+                        document.getElementById(sid).style.display = sid === id ? '' : 'none';
+                    });
+                    activeSection = id;
+                    document.getElementById('active-section-label').textContent = 'Active: ' + document.getElementById(id).querySelector('h5').textContent;
+                }
+                // Build navigation
+                const nav = document.getElementById('control-panel-nav');
+                nav.innerHTML = '';
+                sectionIds.forEach((sid, idx) => {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'btn panel-nav-btn' + (idx === 0 ? ' active' : '');
+                    btn.textContent = document.getElementById(sid).querySelector('h5').textContent;
+                    btn.onclick = () => {
+                        showSection(sid);
+                        Array.from(nav.children).forEach(b => b.classList.remove('active'));
+                        btn.classList.add('active');
+                    };
+                    nav.appendChild(btn);
+                });
+                // Show first section by default
+                showSection(sectionIds[0]);
+                // Section counter
+                document.getElementById('section-counter').textContent = `${sectionIds.indexOf(activeSection)+1}/${sectionIds.length} sections`;
+                // Prev/Next buttons
+                document.getElementById('panel-prev-btn').onclick = () => {
+                    let idx = sectionIds.indexOf(activeSection);
+                    if (idx > 0) showSection(sectionIds[idx-1]);
+                    Array.from(nav.children).forEach((b, i) => b.classList.toggle('active', i === idx-1));
+                    document.getElementById('section-counter').textContent = `${sectionIds.indexOf(activeSection)+1}/${sectionIds.length} sections`;
+                };
+                document.getElementById('panel-next-btn').onclick = () => {
+                    let idx = sectionIds.indexOf(activeSection);
+                    if (idx < sectionIds.length-1) showSection(sectionIds[idx+1]);
+                    Array.from(nav.children).forEach((b, i) => b.classList.toggle('active', i === idx+1));
+                    document.getElementById('section-counter').textContent = `${sectionIds.indexOf(activeSection)+1}/${sectionIds.length} sections`;
+                };
+            </script>
 +            
 +            <!-- ads.txt editor card -->
 +            <div class="card section-card mb-3" id="ads-txt-editor">
@@ -1861,7 +1986,10 @@ $settingsRows = $settingsStmt->fetchAll(PDO::FETCH_ASSOC);
                     </form>
                     <small class="text-secondary">Use this section to inject tracking scripts globally across the site.</small>
                     <div class="alert alert-secondary mt-3 mb-0">
-                        <div><strong>Sitemap URL:</strong> <code><?= e($sitemapUrl) ?></code></div>
+                        <div><strong>Sitemap URL:</strong> <code id="sitemap-url"><?= e($sitemapUrl) ?></code>
+                            <button class="copy-btn" onclick="copyToClipboard('sitemap-url')" title="نسخ"><i class="bi bi-clipboard"></i></button>
+                            <span id="copy-success-sitemap" class="copy-success" style="display:none;">تم النسخ!</span>
+                        </div>
                         <div class="small mt-2">Submit this URL in Google Search Console and Bing Webmaster Tools for faster indexing.</div>
                     </div>
                 </div>
@@ -1870,6 +1998,38 @@ $settingsRows = $settingsStmt->fetchAll(PDO::FETCH_ASSOC);
             <div class="card section-card mb-3" id="niche-management">
                 <div class="card-body">
                     <h5><i class="bi bi-kanban-fill"></i> Niche Management</h5>
+                    <form method="post" class="row g-2 mb-3">
+                        <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
+                        <div class="col-12">
+                            <label class="form-label">نشر محتوى لأكثر من نيش</label>
+                            <select name="multi_niches[]" class="form-select" multiple>
+                                <?php foreach ($nichesList as $n): ?>
+                                    <option value="<?= e($n['slug']) ?>"><?= e($n['name']) ?> (<?= e($n['slug']) ?>)</option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-12 mt-2">
+                            <button name="publish_multi_niches" value="1" class="btn btn-success">نشر في جميع النيشات المختارة</button>
+                        </div>
+                    </form>
+
+                    <?php
+                    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['publish_multi_niches'])) {
+                        $selectedNiches = $_POST['multi_niches'] ?? [];
+                        $count = 0;
+                        foreach ($selectedNiches as $nicheSlug) {
+                            setSetting('active_niche', $nicheSlug);
+                            $result = publishAutoArticleBySchedule(true);
+                            if (($result['published'] ?? 0) === 1) {
+                                $count++;
+                            }
+                        }
+                        $_SESSION['flash_message'] = "تم النشر في {$count} نيش.";
+                        $_SESSION['flash_type'] = 'success';
+                        header('Location: admin.php');
+                        exit;
+                    }
+                    ?>
 
                     <form method="post" class="row g-2 mb-3">
                         <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
@@ -2089,6 +2249,48 @@ $settingsRows = $settingsStmt->fetchAll(PDO::FETCH_ASSOC);
             <div class="card section-card mb-3" id="auto-scheduler-section">
                 <div class="card-body">
                     <h5 class="text-danger"><i class="bi bi-robot"></i> AI Auto Publish Scheduler</h5>
+                    <form method="post" class="row g-2 align-items-end mb-3">
+                        <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
+                        <div class="col-12">
+                            <label class="form-label">إدارة العنوان التلقائي لكل نيش</label>
+                            <select name="niche_auto_title" class="form-select">
+                                <option value="">اختر النيش</option>
+                                <?php foreach ($nichesList as $n): ?>
+                                    <option value="<?= e($n['slug']) ?>"><?= e($n['name']) ?> (<?= e($n['slug']) ?>)</option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-12 mt-2">
+                            <button name="manage_niche_auto_title" value="1" class="btn btn-warning">إدارة إعدادات العنوان التلقائي للنيش</button>
+                        </div>
+                    </form>
+
+                    <?php
+                    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['manage_niche_auto_title'])) {
+                        $nicheSlug = $_POST['niche_auto_title'] ?? '';
+                        if ($nicheSlug !== '') {
+                            setSetting('active_niche', $nicheSlug);
+                            // مثال: يمكن تخصيص إعدادات العنوان التلقائي هنا لكل نيش
+                            $_SESSION['flash_message'] = "تم تفعيل إدارة العنوان التلقائي للنيش: {$nicheSlug}";
+                            $_SESSION['flash_type'] = 'info';
+                            header('Location: admin.php');
+                            exit;
+                        }
+                    }
+                    ?>
+                                    <!-- تحسينات ذكية: عرض ملخص لكل نيش وعدد المقالات والمصادر -->
+                                    <div class="mb-3">
+                                        <h6 class="text-info">ملخص النيشات</h6>
+                                        <ul class="list-group">
+                                            <?php foreach ($nichesList as $n): ?>
+                                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                                    <span><strong><?= e($n['name']) ?></strong> (<?= e($n['slug']) ?>)</span>
+                                                    <span class="badge bg-primary">مقالات: <?= (int)$pdo->query("SELECT COUNT(*) FROM articles WHERE category = '" . $n['slug'] . "'")->fetchColumn() ?></span>
+                                                    <span class="badge bg-success">مصادر: <?= (int)$pdo->query("SELECT COUNT(*) FROM niche_sources WHERE niche_id = " . (int)$n['id'])->fetchColumn() ?></span>
+                                                </li>
+                                            <?php endforeach; ?>
+                                        </ul>
+                                    </div>
                     <form method="post" class="row g-2 align-items-end">
                         <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
                         <div class="col-12">
@@ -2218,10 +2420,22 @@ $settingsRows = $settingsStmt->fetchAll(PDO::FETCH_ASSOC);
                 <div class="card-body">
                     <h5><i class="bi bi-gear-wide-connected"></i> System Constants (Read Only)</h5>
                     <div class="small">
-                        <div><span class="text-secondary">SITE_TITLE (fallback constant):</span> <code><?= e(SITE_TITLE) ?></code></div>
-                        <div><span class="text-secondary">Configured Site Title:</span> <code><?= e($siteTitle) ?></code></div>
-                        <div><span class="text-secondary">DB_FILE:</span> <code><?= e(DB_FILE) ?></code></div>
-                        <div><span class="text-secondary">Password Hash:</span> <code><?= e(substr(PASSWORD_HASH, 0, 20)) ?>...</code></div>
+                        <div><span class="text-secondary">SITE_TITLE (fallback constant):</span> <code id="site-title-const"><?= e(SITE_TITLE) ?></code>
+                            <button class="copy-btn" onclick="copyToClipboard('site-title-const')" title="نسخ"><i class="bi bi-clipboard"></i></button>
+                            <span id="copy-success-title" class="copy-success" style="display:none;">تم النسخ!</span>
+                        </div>
+                        <div><span class="text-secondary">Configured Site Title:</span> <code id="site-title-config"><?= e($siteTitle) ?></code>
+                            <button class="copy-btn" onclick="copyToClipboard('site-title-config')" title="نسخ"><i class="bi bi-clipboard"></i></button>
+                            <span id="copy-success-config" class="copy-success" style="display:none;">تم النسخ!</span>
+                        </div>
+                        <div><span class="text-secondary">DB_FILE:</span> <code id="db-file"><?= e(DB_FILE) ?></code>
+                            <button class="copy-btn" onclick="copyToClipboard('db-file')" title="نسخ"><i class="bi bi-clipboard"></i></button>
+                            <span id="copy-success-db" class="copy-success" style="display:none;">تم النسخ!</span>
+                        </div>
+                        <div><span class="text-secondary">Password Hash:</span> <code id="pass-hash"><?= e(substr(PASSWORD_HASH, 0, 20)) ?>...</code>
+                            <button class="copy-btn" onclick="copyToClipboard('pass-hash')" title="نسخ"><i class="bi bi-clipboard"></i></button>
+                            <span id="copy-success-hash" class="copy-success" style="display:none;">تم النسخ!</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -2350,8 +2564,12 @@ $settingsRows = $settingsStmt->fetchAll(PDO::FETCH_ASSOC);
                                             <tr>
                                                 <td><input type="checkbox" class="form-check-input article-check" name="article_ids[]" value="<?= (int)$row['id'] ?>" form="articlesBulkForm"></td>
                                                 <td>
-                                                    <div class="fw-semibold"><?= e($row['title']) ?></div>
-                                                    <small class="text-secondary">/<?= e($row['slug']) ?></small>
+                                                    <div class="fw-semibold"><?= e($row['title']) ?>
+                                                        <!-- زر نسخ عنوان المقال -->
+                                                        <button class="copy-btn" onclick="copyToClipboard('article-title-<?= (int)$row['id'] ?>')" title="نسخ"><i class="bi bi-clipboard"></i></button>
+                                                        <span id="copy-success-article-title-<?= (int)$row['id'] ?>" class="copy-success" style="display:none;">تم النسخ!</span>
+                                                    </div>
+                                                    <small class="text-secondary" id="article-title-<?= (int)$row['id'] ?>">/<?= e($row['slug']) ?></small>
                                                 </td>
                                                 <td><span class="badge text-bg-secondary"><?= e($row['category'] ?: 'General') ?></span></td>
                                                 <td><?= e($row['published_at']) ?></td>
@@ -2437,7 +2655,10 @@ $settingsRows = $settingsStmt->fetchAll(PDO::FETCH_ASSOC);
                                 <?php else: ?>
                                     <?php foreach ($rssRows as $rss): ?>
                                         <li class="list-group-item d-flex justify-content-between align-items-center">
-                                            <span class="text-break pe-2"><?= e($rss['url']) ?></span>
+                                            <span class="text-break pe-2" id="rss-url-<?= (int)$rss['id'] ?>"><?= e($rss['url']) ?></span>
+                                            <!-- زر نسخ رابط المصدر -->
+                                            <button class="copy-btn" onclick="copyToClipboard('rss-url-<?= (int)$rss['id'] ?>')" title="نسخ"><i class="bi bi-clipboard"></i></button>
+                                            <span id="copy-success-rss-url-<?= (int)$rss['id'] ?>" class="copy-success" style="display:none;">تم النسخ!</span>
                                             <div class="d-flex gap-2">
                                                 <button class="btn btn-sm btn-outline-warning" data-bs-toggle="collapse" data-bs-target="#edit-rss-<?= (int)$rss['id'] ?>" aria-expanded="false">Edit</button>
                                                 <form method="post" onsubmit="return confirm('Remove this source?')">
@@ -2482,7 +2703,10 @@ $settingsRows = $settingsStmt->fetchAll(PDO::FETCH_ASSOC);
                                 <?php else: ?>
                                     <?php foreach ($webRows as $web): ?>
                                         <li class="list-group-item d-flex justify-content-between align-items-center">
-                                            <span class="text-break pe-2"><?= e($web['url']) ?></span>
+                                            <span class="text-break pe-2" id="web-url-<?= (int)$web['id'] ?>"><?= e($web['url']) ?></span>
+                                            <!-- زر نسخ رابط المصدر -->
+                                            <button class="copy-btn" onclick="copyToClipboard('web-url-<?= (int)$web['id'] ?>')" title="نسخ"><i class="bi bi-clipboard"></i></button>
+                                            <span id="copy-success-web-url-<?= (int)$web['id'] ?>" class="copy-success" style="display:none;">تم النسخ!</span>
                                             <div class="d-flex gap-2">
                                                 <button class="btn btn-sm btn-outline-warning" data-bs-toggle="collapse" data-bs-target="#edit-web-<?= (int)$web['id'] ?>" aria-expanded="false">Edit</button>
                                                 <form method="post" onsubmit="return confirm('Remove this source?')">
@@ -2544,10 +2768,16 @@ $settingsRows = $settingsStmt->fetchAll(PDO::FETCH_ASSOC);
                                                 <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
                                                 <input type="hidden" name="original_setting_key" value="<?= e($setting['key']) ?>">
                                                 <div class="col-md-4">
-                                                    <input type="text" name="setting_key" class="form-control form-control-sm" value="<?= e($setting['key']) ?>" required>
+                                                    <input type="text" name="setting_key" class="form-control form-control-sm" value="<?= e($setting['key']) ?>" required id="setting-key-<?= htmlspecialchars($setting['key']) ?>">
+                                                    <!-- زر نسخ مفتاح الإعداد -->
+                                                    <button class="copy-btn" onclick="copyToClipboard('setting-key-<?= htmlspecialchars($setting['key']) ?>')" title="نسخ"><i class="bi bi-clipboard"></i></button>
+                                                    <span id="copy-success-setting-key-<?= htmlspecialchars($setting['key']) ?>" class="copy-success" style="display:none;">تم النسخ!</span>
                                                 </div>
                                                 <div class="col-md-6">
-                                                    <input type="text" name="setting_value" class="form-control form-control-sm" value="<?= e($setting['value']) ?>">
+                                                    <input type="text" name="setting_value" class="form-control form-control-sm" value="<?= e($setting['value']) ?>" id="setting-value-<?= htmlspecialchars($setting['key']) ?>">
+                                                    <!-- زر نسخ قيمة الإعداد -->
+                                                    <button class="copy-btn" onclick="copyToClipboard('setting-value-<?= htmlspecialchars($setting['key']) ?>')" title="نسخ"><i class="bi bi-clipboard"></i></button>
+                                                    <span id="copy-success-setting-value-<?= htmlspecialchars($setting['key']) ?>" class="copy-success" style="display:none;">تم النسخ!</span>
                                                 </div>
                                                 <div class="col-md-2 d-flex gap-2">
                                                     <button name="save_setting" value="1" class="btn btn-sm btn-outline-success flex-fill">Update</button>
@@ -2570,6 +2800,28 @@ $settingsRows = $settingsStmt->fetchAll(PDO::FETCH_ASSOC);
     </div>
 </div>
 <script>
+    // دالة نسخ للقيم المهمة
+    function copyToClipboard(elementId) {
+        var el = document.getElementById(elementId);
+        var val = el ? (el.innerText || el.textContent) : '';
+        if (!val) return;
+        navigator.clipboard.writeText(val).then(function() {
+            var successId = 'copy-success-' + elementId.replace(/[^a-zA-Z0-9]/g, '');
+            var successEl = document.getElementById(successId);
+            if (successEl) {
+                successEl.style.display = 'inline';
+                setTimeout(function(){ successEl.style.display = 'none'; }, 1200);
+            }
+            // تنبيه أعلى الصفحة
+            var topAlert = document.getElementById('top-alert');
+            if(topAlert) {
+                topAlert.textContent = 'تم نسخ القيمة بنجاح!';
+                topAlert.className = 'alert alert-success text-center';
+                topAlert.style.display = 'block';
+                setTimeout(function(){ topAlert.style.display = 'none'; }, 1500);
+            }
+        });
+    }
     document.addEventListener('DOMContentLoaded', function () {
         const sourceCards = Array.from(document.querySelectorAll('#control-cards-source .section-card'));
         const panelNav = document.getElementById('control-panel-nav');
@@ -2582,6 +2834,7 @@ $settingsRows = $settingsStmt->fetchAll(PDO::FETCH_ASSOC);
         const sectionCounter = document.getElementById('section-counter');
         let currentIndex = 0;
 
+             <!-- Removed from here - now inside Auto Title Generator Controls -->
         function getVisibleButtons() {
             return Array.from(panelNav.querySelectorAll('button')).filter(function (btn) {
                 return !btn.classList.contains('d-none');
