@@ -86,7 +86,8 @@ if ($publishedFrom !== '' && $publishedTo !== '' && $publishedFrom > $publishedT
     [$publishedFrom, $publishedTo] = [$publishedTo, $publishedFrom];
 }
 $page = max(1, (int)($_GET['page'] ?? 1));
-$perPage = min(50, max(1, (int)($_GET['per_page'] ?? 10)));
+$appCaps = getAppCaps();
+$perPage = min((int)$appCaps['api_per_page_max'], max(1, (int)($_GET['per_page'] ?? 10)));
 $sort = $_GET['sort'] ?? 'newest';
 
 $sortMap = [

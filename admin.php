@@ -6,17 +6,22 @@ $siteTitle = getSiteTitle();
 $maxAttempts = 5;
 $lockSeconds = 60;
 $now = time();
+$loginCsrf = csrfToken();
 
 $_SESSION['login_attempts'] = (int)($_SESSION['login_attempts'] ?? 0);
 $_SESSION['login_lock_until'] = (int)($_SESSION['login_lock_until'] ?? 0);
 
 $isLocked = $_SESSION['login_lock_until'] > $now;
 $remainingLockSeconds = max(0, $_SESSION['login_lock_until'] - $now);
+$remainingAttempts = max(0, $maxAttempts - (int)$_SESSION['login_attempts']);
 
 if (!isset($_SESSION['logged']) && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['pass'])) {
     $submittedPassword = (string)($_POST['pass'] ?? '');
+    $submittedToken = (string)($_POST['csrf_token'] ?? '');
 
-    if ($isLocked) {
+    if (!verifyCsrfToken($submittedToken)) {
+        $_SESSION['login_error'] = 'Session expired. Refresh the page and try again.';
+    } elseif ($isLocked) {
         $_SESSION['login_error'] = 'Too many attempts. Try again in ' . $remainingLockSeconds . ' seconds.';
     } elseif ($submittedPassword === '') {
         $_SESSION['login_error'] = 'Password is required.';
@@ -76,15 +81,54 @@ if (!isset($_SESSION['logged'])) {
                 <div class="alert alert-danger py-2 small mb-3" role="alert"><?= e($loginError) ?></div>
             <?php endif; ?>
 
+            <?php if ($isLocked): ?>
+                <div class="alert alert-warning py-2 small mb-3" role="alert">
+                    Login is temporarily locked. Try again in <strong id="lock-seconds"><?= (int)$remainingLockSeconds ?></strong>s.
+                </div>
+            <?php else: ?>
+                <div class="text-secondary small mb-2">Remaining attempts before lock: <strong><?= (int)$remainingAttempts ?></strong> / <?= (int)$maxAttempts ?></div>
+            <?php endif; ?>
+
             <form method="post" autocomplete="off">
+                <input type="hidden" name="csrf_token" value="<?= e($loginCsrf) ?>">
                 <label for="pass" class="form-label">Password</label>
-                <input id="pass" type="password" name="pass" class="form-control form-control-lg" placeholder="Enter admin password" autocomplete="current-password" required autofocus>
-                <button class="btn btn-primary w-100 mt-3">Login</button>
+                <div class="input-group">
+                    <input id="pass" type="password" name="pass" class="form-control form-control-lg" placeholder="Enter admin password" autocomplete="current-password" required autofocus <?= $isLocked ? 'disabled' : '' ?>>
+                    <button type="button" class="btn btn-outline-light" id="toggle-pass" <?= $isLocked ? 'disabled' : '' ?>>Show</button>
+                </div>
+                <button class="btn btn-primary w-100 mt-3" <?= $isLocked ? 'disabled' : '' ?>>Login</button>
             </form>
 
             <small class="d-block text-secondary mt-3 text-center">Tip: set <code>ADMIN_PASSWORD</code> env var for production.</small>
         </div>
     </main>
+    <script>
+        (function () {
+            const passInput = document.getElementById('pass');
+            const toggleBtn = document.getElementById('toggle-pass');
+            if (passInput && toggleBtn) {
+                toggleBtn.addEventListener('click', function () {
+                    const isPassword = passInput.type === 'password';
+                    passInput.type = isPassword ? 'text' : 'password';
+                    toggleBtn.textContent = isPassword ? 'Hide' : 'Show';
+                });
+            }
+
+            const lockEl = document.getElementById('lock-seconds');
+            if (lockEl) {
+                let seconds = parseInt(lockEl.textContent || '0', 10);
+                const timer = setInterval(function () {
+                    seconds -= 1;
+                    if (seconds <= 0) {
+                        clearInterval(timer);
+                        window.location.reload();
+                        return;
+                    }
+                    lockEl.textContent = String(seconds);
+                }, 1000);
+            }
+        })();
+    </script>
     </body>
     </html>
     <?php
@@ -99,6 +143,8 @@ if (!isset($_SESSION['flash_message'])) {
     $_SESSION['flash_message'] = null;
     $_SESSION['flash_type'] = 'info';
 }
+
+$appCaps = getAppCaps();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
@@ -140,7 +186,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (isset($_POST['update_daily_limit'])) {
         $newLimit = (int)($_POST['daily_limit'] ?? 5);
-        $newLimit = max(1, min(200, $newLimit));
+        $newLimit = max(1, min((int)$appCaps['daily_limit_max'], $newLimit));
         setSetting('daily_limit', (string)$newLimit);
         $_SESSION['flash_message'] = 'Daily workflow generation limit updated.';
         $_SESSION['flash_type'] = 'success';
@@ -383,6 +429,56 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
+
+    if (isset($_POST['apply_content_preset'])) {
+        $preset = (string)($_POST['content_preset'] ?? 'balanced_seo');
+        $presets = [
+            'balanced_seo' => [
+                'content_structure_mode' => 'balanced',
+                'content_intro_style' => 'balanced',
+                'content_include_checklist' => '1',
+                'content_include_comparison_table' => '1',
+                'content_include_faq_section' => '1',
+                'content_include_people_also_ask' => '1',
+                'content_include_toc' => '1',
+                'content_tone_guide' => 'Balanced SEO tone with practical buyer value and clear structure.',
+            ],
+            'fast_publish' => [
+                'content_structure_mode' => 'compact',
+                'content_intro_style' => 'short',
+                'content_include_checklist' => '0',
+                'content_include_comparison_table' => '0',
+                'content_include_faq_section' => '0',
+                'content_include_people_also_ask' => '0',
+                'content_include_toc' => '0',
+                'content_tone_guide' => 'Short, direct, and fast-to-read content.',
+            ],
+            'authority_deep' => [
+                'content_structure_mode' => 'deep',
+                'content_intro_style' => 'detailed',
+                'content_include_checklist' => '1',
+                'content_include_comparison_table' => '1',
+                'content_include_faq_section' => '1',
+                'content_include_people_also_ask' => '1',
+                'content_include_toc' => '1',
+                'content_tone_guide' => 'Authoritative, analytical, and ownership-focused editorial depth.',
+            ],
+        ];
+
+        if (!isset($presets[$preset])) {
+            $preset = 'balanced_seo';
+        }
+
+        foreach ($presets[$preset] as $k => $v) {
+            setSetting($k, (string)$v);
+        }
+
+        $_SESSION['flash_message'] = 'Content preset applied: ' . $preset;
+        $_SESSION['flash_type'] = 'success';
+        header('Location: admin.php');
+        exit;
+    }
+
     if (isset($_POST['update_pipeline_settings'])) {
         $minWordsFrom = (int)($_POST['min_words_from'] ?? 300);
         $minWordsTo = (int)($_POST['min_words_to'] ?? 3000);
@@ -403,7 +499,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $queueRetryDelay = max(5, min(7200, $queueRetryDelay));
 
         $queueMaxAttempts = (int)($_POST['queue_max_attempts'] ?? 3);
-        $queueMaxAttempts = max(1, min(20, $queueMaxAttempts));
+        $queueMaxAttempts = max(1, min((int)$appCaps['queue_max_attempts_max'], $queueMaxAttempts));
 
         $intervalMinutes = (int)($_POST['auto_publish_interval_minutes'] ?? 180);
         $intervalMinutes = max(1, $intervalMinutes);
@@ -415,6 +511,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $visitExcludedIps = normalizeExcludedIpRules($visitExcludedIps);
 
         $apiLockEnabled = isset($_POST['api_lock_enabled']) ? 1 : 0;
+
+        $contentTone = trim((string)($_POST['content_tone_guide'] ?? ''));
+        if (mb_strlen($contentTone) > 4000) {
+            $contentTone = mb_substr($contentTone, 0, 4000);
+        }
+        $contentStructureMode = (string)($_POST['content_structure_mode'] ?? 'balanced');
+        if (!in_array($contentStructureMode, ['compact', 'balanced', 'deep'], true)) {
+            $contentStructureMode = 'balanced';
+        }
+        $contentIncludeChecklist = isset($_POST['content_include_checklist']) ? 1 : 0;
+        $contentIncludeComparisonTable = isset($_POST['content_include_comparison_table']) ? 1 : 0;
+        $contentIntroStyle = (string)($_POST['content_intro_style'] ?? 'balanced');
+        if (!in_array($contentIntroStyle, ['short', 'balanced', 'detailed'], true)) {
+            $contentIntroStyle = 'balanced';
+        }
+        $contentIncludeFaqSection = isset($_POST['content_include_faq_section']) ? 1 : 0;
+        $contentIncludePeopleAlsoAsk = isset($_POST['content_include_people_also_ask']) ? 1 : 0;
+        $contentIncludeToc = isset($_POST['content_include_toc']) ? 1 : 0;
         $apiAccessKey = trim((string)($_POST['api_access_key'] ?? ''));
         if (mb_strlen($apiAccessKey) > 255) {
             $apiAccessKey = mb_substr($apiAccessKey, 0, 255);
@@ -438,6 +552,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         setSetting('visit_excluded_ips', $visitExcludedIps);
         setSetting('api_lock_enabled', (string)$apiLockEnabled);
         setSetting('api_access_key', $apiAccessKey);
+        setSetting('content_tone_guide', $contentTone);
+        setSetting('content_structure_mode', $contentStructureMode);
+        setSetting('content_include_checklist', (string)$contentIncludeChecklist);
+        setSetting('content_include_comparison_table', (string)$contentIncludeComparisonTable);
+        setSetting('content_intro_style', $contentIntroStyle);
+        setSetting('content_include_faq_section', (string)$contentIncludeFaqSection);
+        setSetting('content_include_people_also_ask', (string)$contentIncludePeopleAlsoAsk);
+        setSetting('content_include_toc', (string)$contentIncludeToc);
 
         // Keep minute + second based scheduler settings synchronized.
         $secondsFromMinutes = $intervalMinutes > intdiv(PHP_INT_MAX, 60) ? PHP_INT_MAX : ($intervalMinutes * 60);
@@ -1095,6 +1217,24 @@ foreach ($pageVisitStats as $visitRow) {
     $totalTrackedVisitors += (int)($visitRow['unique_visitors'] ?? 0);
 }
 $dailyLimit = (int)getSetting('daily_limit', 5);
+
+$visitRowsCount = count($pageVisitStats);
+$avgViewsPerVisitor = $totalTrackedVisitors > 0 ? round($totalTrackedViews / $totalTrackedVisitors, 2) : 0;
+$last24hVisitorsTotal = 0;
+foreach ($pageVisitStats as $visitRow) {
+    $last24hVisitorsTotal += (int)($visitRow['visitors_24h'] ?? 0);
+}
+
+$adsBlockedKeywordCount = count(array_filter(array_map('trim', explode(',', $adsBlockedTitleKeywords)), static fn($v) => $v !== ''));
+$adsBlockedCategoryCount = count(array_filter(array_map('trim', explode(',', $adsBlockedCategories)), static fn($v) => $v !== ''));
+$adsReadinessScore = 0;
+$adsReadinessScore += $adsEnabled ? 35 : 0;
+$adsReadinessScore += trim($adsHtmlCode) !== '' ? 25 : 0;
+$adsReadinessScore += $adsMinArticleWords >= 200 ? 15 : 0;
+$adsReadinessScore += $adsMaxUnits <= 4 ? 15 : 0;
+$adsReadinessScore += ($adsBlockedKeywordCount + $adsBlockedCategoryCount) > 0 ? 10 : 0;
+$adsReadinessScore = max(0, min(100, (int)$adsReadinessScore));
+
 $seoHomeTitle = (string)getSetting('seo_home_title', $siteTitle);
 $seoHomeDescription = (string)getSetting('seo_home_description', 'Automotive reviews, guides, and practical car ownership tips.');
 $seoArticleTitleSuffix = (string)getSetting('seo_article_title_suffix', $siteTitle);
@@ -1144,13 +1284,23 @@ $minWords = max(300, $minWordsTo);
 $urlCacheTtlSeconds = getSettingInt('url_cache_ttl_seconds', 900, 60, 86400);
 $workflowBatchSize = getSettingInt('workflow_batch_size', 8, 1, 50);
 $queueRetryDelaySeconds = getSettingInt('queue_retry_delay_seconds', 60, 5, 7200);
-$queueMaxAttempts = getSettingInt('queue_max_attempts', 3, 1, 20);
+$queueMaxAttempts = getSettingInt('queue_max_attempts', 3, 1, 30);
 $fetchTimeoutSeconds = getSettingInt('fetch_timeout_seconds', 12, 3, 45);
 $fetchRetryAttempts = getSettingInt('fetch_retry_attempts', 3, 1, 5);
 $fetchRetryBackoffMs = getSettingInt('fetch_retry_backoff_ms', 350, 100, 3000);
 $queueSourceCooldownSeconds = getSettingInt('queue_source_cooldown_seconds', 180, 30, 7200);
 $fetchUserAgent = (string)getSetting('fetch_user_agent', 'Mozilla/5.0 (compatible; VitoBot/1.0; +https://example.com/bot)');
 $visitExcludedIps = (string)getSetting('visit_excluded_ips', '');
+$contentToneGuide = (string)getSetting('content_tone_guide', '');
+$contentStructureMode = (string)getSetting('content_structure_mode', 'balanced');
+if (!in_array($contentStructureMode, ['compact', 'balanced', 'deep'], true)) { $contentStructureMode = 'balanced'; }
+$contentIncludeChecklist = getSettingInt('content_include_checklist', 1, 0, 1) === 1;
+$contentIncludeComparisonTable = getSettingInt('content_include_comparison_table', 1, 0, 1) === 1;
+$contentIntroStyle = (string)getSetting('content_intro_style', 'balanced');
+if (!in_array($contentIntroStyle, ['short', 'balanced', 'detailed'], true)) { $contentIntroStyle = 'balanced'; }
+$contentIncludeFaqSection = getSettingInt('content_include_faq_section', 1, 0, 1) === 1;
+$contentIncludePeopleAlsoAsk = getSettingInt('content_include_people_also_ask', 1, 0, 1) === 1;
+$contentIncludeToc = getSettingInt('content_include_toc', 1, 0, 1) === 1;
 $apiLockEnabled = getSettingInt('api_lock_enabled', 0, 0, 1) === 1;
 $apiAccessKey = (string)getSetting('api_access_key', '');
 $detectedVisitorIp = getVisitorIpAddress();
@@ -1641,6 +1791,8 @@ $settingsRows = $settingsStmt->fetchAll(PDO::FETCH_ASSOC);
                 <span class="badge bg-warning text-dark">الحد اليومي: <?= $dailyLimit ?></span>
                 <span class="badge bg-info text-dark">آخر نشر: <?= e($latestDate ?: 'N/A') ?></span>
                 <span class="badge bg-secondary">الزوار: <?= (int)$totalTrackedVisitors ?> • المشاهدات: <?= (int)$totalTrackedViews ?></span>
+                <span class="badge bg-dark">تفاعل/زائر: <?= e(number_format($avgViewsPerVisitor, 2)) ?></span>
+                <span class="badge bg-success">جاهزية الإعلانات: <?= (int)$adsReadinessScore ?>%</span>
             </div>
         </div>
     </div>
@@ -1660,6 +1812,7 @@ $settingsRows = $settingsStmt->fetchAll(PDO::FETCH_ASSOC);
                     <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
                     <button name="clear_page_visits" value="1" class="btn btn-sm btn-outline-danger" onclick="return confirm('This will remove all stored page visit records. Proceed?')">Clear all visits</button>
                 </form>
+                <small class="text-secondary">Pages tracked: <?= (int)$visitRowsCount ?> · Visitors (24h): <?= (int)$last24hVisitorsTotal ?> · Avg views/visitor: <?= e(number_format($avgViewsPerVisitor, 2)) ?></small>
 
             <?php if (!$pageVisitStats): ?>
                 <small class="text-secondary">No visit data yet. Open the public pages and stats will appear automatically.</small>
@@ -1673,6 +1826,7 @@ $settingsRows = $settingsStmt->fetchAll(PDO::FETCH_ASSOC);
                             <th class="text-center">Unique</th>
                             <th class="text-center">Views</th>
                             <th class="text-center">Last 24h</th>
+                            <th class="text-center">Engagement</th>
                             <th style="width: 180px;">Trend</th>
                         </tr>
                         </thead>
@@ -1687,6 +1841,8 @@ $settingsRows = $settingsStmt->fetchAll(PDO::FETCH_ASSOC);
                                 <td class="text-center"><span class="badge text-bg-secondary"><?= (int)$visitRow['unique_visitors'] ?></span></td>
                                 <td class="text-center"><span class="badge text-bg-primary"><?= (int)$visitRow['total_views'] ?></span></td>
                                 <td class="text-center"><span class="badge text-bg-dark"><?= (int)$visitRow['visitors_24h'] ?></span></td>
+                                <?php $engagement = (int)$visitRow['unique_visitors'] > 0 ? round(((int)$visitRow['total_views'] / (int)$visitRow['unique_visitors']), 2) : 0; ?>
+                                <td class="text-center"><span class="badge text-bg-info"><?= e(number_format($engagement, 2)) ?></span></td>
                                 <td>
                                     <div class="progress" role="progressbar" aria-label="Page views trend" aria-valuenow="<?= $ratio ?>" aria-valuemin="0" aria-valuemax="100">
                                         <div class="progress-bar bg-info" style="width: <?= $ratio ?>%"></div>
@@ -1728,11 +1884,27 @@ $settingsRows = $settingsStmt->fetchAll(PDO::FETCH_ASSOC);
                 <div class="card section-card mb-3 panel-section" id="publishing-settings" style="display:none;">
                     <div class="card-body">
                         <h5><i class="bi bi-sliders"></i> Daily Publishing Limit</h5>
-                        <form method="post" class="row g-2 align-items-end">
+                        
+                    <form method="post" class="row g-2 align-items-end mb-3">
+                        <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
+                        <div class="col-8">
+                            <label class="form-label">Quick Content Preset</label>
+                            <select name="content_preset" class="form-select">
+                                <option value="balanced_seo">Balanced SEO (Recommended)</option>
+                                <option value="fast_publish">Fast Publish</option>
+                                <option value="authority_deep">Authority Deep</option>
+                            </select>
+                        </div>
+                        <div class="col-4">
+                            <button name="apply_content_preset" value="1" class="btn btn-outline-warning w-100">Apply Preset</button>
+                        </div>
+                    </form>
+                    <small class="text-secondary d-block mb-2">Current: <?= e($contentStructureMode) ?> / <?= e($contentIntroStyle) ?> · TOC <?= $contentIncludeToc ? 'on' : 'off' ?> · FAQ <?= $contentIncludeFaqSection ? 'on' : 'off' ?> · PAA <?= $contentIncludePeopleAlsoAsk ? 'on' : 'off' ?></small>
+                    <form method="post" class="row g-2 align-items-end">
                             <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
                             <div class="col-8">
                                 <label class="form-label">Daily Workflow Limit</label>
-                                <input type="number" name="daily_limit" class="form-control" min="1" max="200" value="<?= $dailyLimit ?>">
+                                <input type="number" name="daily_limit" class="form-control" min="1" max="<?= (int)$appCaps['daily_limit_max'] ?>" value="<?= $dailyLimit ?>">
                             </div>
                             <div class="col-4">
                                 <button name="update_daily_limit" value="1" class="btn btn-outline-light w-100">Save</button>
@@ -2192,7 +2364,7 @@ $settingsRows = $settingsStmt->fetchAll(PDO::FETCH_ASSOC);
                         </div>
                         <div class="col-6">
                             <label class="form-label">Queue Max Attempts</label>
-                            <input type="number" name="queue_max_attempts" class="form-control" min="1" max="20" value="<?= (int)$queueMaxAttempts ?>">
+                            <input type="number" name="queue_max_attempts" class="form-control" min="1" max="<?= (int)$appCaps['queue_max_attempts_max'] ?>" value="<?= (int)$queueMaxAttempts ?>">
                         </div>
                         <div class="col-6">
                             <label class="form-label">Auto Publish Interval (minutes)</label>
@@ -2208,6 +2380,62 @@ $settingsRows = $settingsStmt->fetchAll(PDO::FETCH_ASSOC);
                             <label class="form-label">API Access Key</label>
                             <input type="text" name="api_access_key" class="form-control" maxlength="255" value="<?= e($apiAccessKey) ?>" placeholder="Set a secret key for api.php">
                             <small class="text-secondary">When lock is enabled, pass key using <code>?key=YOUR_SECRET</code> or <code>X-API-Key</code> header.</small>
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label">Content Tone Guide (for generated articles)</label>
+                            <textarea name="content_tone_guide" class="form-control" rows="4" maxlength="4000" placeholder="Example: Use concise language, include real-world buyer advice, avoid hype, and always include maintenance-cost perspective."><?= e($contentToneGuide) ?></textarea>
+                            <small class="text-secondary">Easy way to steer generated content style from admin without editing code.</small>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Content Structure Mode</label>
+                            <select name="content_structure_mode" class="form-select">
+                                <option value="compact" <?= $contentStructureMode === 'compact' ? 'selected' : '' ?>>Compact</option>
+                                <option value="balanced" <?= $contentStructureMode === 'balanced' ? 'selected' : '' ?>>Balanced</option>
+                                <option value="deep" <?= $contentStructureMode === 'deep' ? 'selected' : '' ?>>Deep</option>
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <div class="form-check form-switch mt-4">
+                                <input class="form-check-input" type="checkbox" id="content_include_checklist" name="content_include_checklist" <?= $contentIncludeChecklist ? 'checked' : '' ?>>
+                                <label class="form-check-label" for="content_include_checklist">Include Buying Checklist Section</label>
+                            </div>
+                        </div>
+
+                        <div class="col-6">
+                            <label class="form-label">Intro Style</label>
+                            <select name="content_intro_style" class="form-select">
+                                <option value="short" <?= $contentIntroStyle === 'short' ? 'selected' : '' ?>>Short</option>
+                                <option value="balanced" <?= $contentIntroStyle === 'balanced' ? 'selected' : '' ?>>Balanced</option>
+                                <option value="detailed" <?= $contentIntroStyle === 'detailed' ? 'selected' : '' ?>>Detailed</option>
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <div class="form-check form-switch mt-4">
+                                <input class="form-check-input" type="checkbox" id="content_include_comparison_table" name="content_include_comparison_table" <?= $contentIncludeComparisonTable ? 'checked' : '' ?>>
+                                <label class="form-check-label" for="content_include_comparison_table">Include Comparison Table Section</label>
+                            </div>
+                        </div>
+
+                        <div class="col-4">
+                            <div class="form-check form-switch mt-4">
+                                <input class="form-check-input" type="checkbox" id="content_include_faq_section" name="content_include_faq_section" <?= $contentIncludeFaqSection ? 'checked' : '' ?>>
+                                <label class="form-check-label" for="content_include_faq_section">Include FAQ Section</label>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="form-check form-switch mt-4">
+                                <input class="form-check-input" type="checkbox" id="content_include_people_also_ask" name="content_include_people_also_ask" <?= $contentIncludePeopleAlsoAsk ? 'checked' : '' ?>>
+                                <label class="form-check-label" for="content_include_people_also_ask">Include People Also Ask</label>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="form-check form-switch mt-4">
+                                <input class="form-check-input" type="checkbox" id="content_include_toc" name="content_include_toc" <?= $contentIncludeToc ? 'checked' : '' ?>>
+                                <label class="form-check-label" for="content_include_toc">Include TOC</label>
+                            </div>
+                        </div>
+
                         </div>
                         <div class="col-12">
                             <label class="form-label">Exclude IPs From Visit Analytics</label>

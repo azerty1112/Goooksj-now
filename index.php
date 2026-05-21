@@ -1179,7 +1179,10 @@ $baseQuery['per_page'] = $perPage;
                         <div class="col">
                             <a href="?slug=<?= e($t['slug']) ?>" class="card h-100 text-decoration-none shadow-sm">
                                 <div class="card-body">
-                                    <h6 class="card-title mb-1"><?= e(mb_substr($ttitle, 0, 45)) ?>...</h6>
+                                    <?php $ttrim = trim((string)$ttitle); ?>
+                                    <h6 class="card-title mb-1">
+                                        <?= e(mb_strlen($ttrim) > 45 ? mb_substr($ttrim, 0, 45) . '…' : $ttrim) ?>
+                                    </h6>
                                     <small class="text-muted">
                                         <i class="bi bi-eye"></i> <?= (int)($t['views'] ?? 0) ?> views
                                         <?php if ((int)($t['avg_rating'] ?? 0) > 0): ?>
@@ -1195,17 +1198,6 @@ $baseQuery['per_page'] = $perPage;
         <?php endif;
     }
     ?>
-
-    <?php if ($categories): ?>
-        <div class="quick-categories mb-4">
-            <?php $allQuery = array_merge($baseQuery, ['category' => '', 'page' => 1]); ?>
-            <a class="<?= $category === '' ? 'active' : '' ?>" href="index.php?<?= e(http_build_query($allQuery)) ?>">All</a>
-            <?php foreach (array_slice($categories, 0, 8) as $categoryChip): ?>
-                <?php $chipQuery = array_merge($baseQuery, ['category' => $categoryChip, 'page' => 1]); ?>
-                <a class="<?= $category === $categoryChip ? 'active' : '' ?>" href="index.php?<?= e(http_build_query($chipQuery)) ?>"><?= e($categoryChip) ?></a>
-            <?php endforeach; ?>
-        </div>
-    <?php endif; ?>
 
     <?php
     $clauses = [];
