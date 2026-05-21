@@ -12,6 +12,9 @@ $uiText = [
     'privacy' => $isArabic ? 'سياسة الخصوصية' : 'Privacy Policy',
     'terms' => $isArabic ? 'الشروط' : 'Terms',
     'contact' => $isArabic ? 'تواصل معنا' : 'Contact Us',
+    'ad_policy' => $isArabic ? 'سياسة الإعلانات' : 'Ad Policy',
+    'editorial_policy' => $isArabic ? 'السياسة التحريرية' : 'Editorial Policy',
+    'corrections_policy' => $isArabic ? 'سياسة التصحيحات' : 'Corrections',
     'designed_for' => $isArabic ? 'مصمم لعشاق السيارات' : 'Designed for car enthusiasts',
 ];
 $baseUrl = getSiteBaseUrl();
@@ -922,6 +925,9 @@ if ($slug === '' && $staticPage === '') {
             <a href="index.php?doc=privacy&amp;lang=<?= e($language) ?>" class="btn btn-sm btn-outline-light"><?= e($uiText['privacy']) ?></a>
             <a href="index.php?doc=terms&amp;lang=<?= e($language) ?>" class="btn btn-sm btn-outline-light"><?= e($uiText['terms']) ?></a>
             <a href="index.php?doc=contact&amp;lang=<?= e($language) ?>" class="btn btn-sm btn-outline-light"><?= e($uiText['contact']) ?></a>
+            <a href="index.php?doc=ad-policy&amp;lang=<?= e($language) ?>" class="btn btn-sm btn-outline-light"><?= e($uiText['ad_policy']) ?></a>
+            <a href="index.php?doc=editorial-policy&amp;lang=<?= e($language) ?>" class="btn btn-sm btn-outline-light"><?= e($uiText['editorial_policy']) ?></a>
+            <a href="index.php?doc=corrections&amp;lang=<?= e($language) ?>" class="btn btn-sm btn-outline-light"><?= e($uiText['corrections_policy']) ?></a>
         </div>
     </div>
 </nav>
@@ -1020,7 +1026,10 @@ $baseQuery['per_page'] = $perPage;
         <?php foreach ($selectedPage['content'] as $block): ?>
             <p><?= e($block) ?></p>
         <?php endforeach; ?>
-        <?php if ($staticPage === 'privacy'): ?>
+        <p class="small text-muted mb-2">
+            <?= $isArabic ? 'آخر تحديث لهذه الصفحة:' : 'Last updated:' ?> <?= e(date('Y-m-d')) ?>
+        </p>
+        <?php if ($staticPage === 'privacy' || $staticPage === 'ad-policy'): ?>
             <p class="mb-0"><strong>Advertising notice:</strong> This site may display third-party advertisements. Sponsored placements are labeled where applicable.</p>
         <?php endif; ?>
     </section>
@@ -1423,6 +1432,9 @@ $baseQuery['per_page'] = $perPage;
         <a href="index.php?doc=privacy&amp;lang=<?= e($language) ?>"><?= e($uiText['privacy']) ?></a>
         <a href="index.php?doc=terms&amp;lang=<?= e($language) ?>"><?= e($uiText['terms']) ?></a>
         <a href="index.php?doc=contact&amp;lang=<?= e($language) ?>"><?= e($uiText['contact']) ?></a>
+        <a href="index.php?doc=ad-policy&amp;lang=<?= e($language) ?>"><?= e($uiText['ad_policy']) ?></a>
+        <a href="index.php?doc=editorial-policy&amp;lang=<?= e($language) ?>"><?= e($uiText['editorial_policy']) ?></a>
+        <a href="index.php?doc=corrections&amp;lang=<?= e($language) ?>"><?= e($uiText['corrections_policy']) ?></a>
     </div>
 </footer>
 </div>

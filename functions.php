@@ -2265,11 +2265,15 @@ function getStaticPages($language = null) {
                     'ننشر محتوى عمليًا عن السيارات يركز على أسئلة المالك الحقيقية مثل الصيانة والشراء والسلامة.',
                     'نجمع بين الأتمتة والمراجعة البشرية لضمان جودة المحتوى وسهولة القراءة.',
                     'نلتزم بالوضوح والشفافية لمساعدة القرّاء على اتخاذ قرارات أفضل.',
+                    'نحدّث المقالات دوريًا عند تغيّر المعلومات أو ظهور تحديثات مهمة من الشركات المصنعة.',
+                    'أي محتوى ممول أو إعلاني يتم تمييزه بوضوح للحفاظ على ثقة القارئ.',
                 ]
                 : [
                     'We publish practical automotive content focused on real ownership questions: maintenance, buying, safety, and long-term value.',
                     'Our editorial workflow combines automated research with final quality checks for readability, originality, and user usefulness.',
                     'We prioritize clear language, transparent labeling, and content that helps readers make better car decisions.',
+                    'We periodically review and refresh older articles when important vehicle, pricing, or safety updates are published.',
+                    'Any sponsored or promotional content is clearly labeled to keep a strong separation between ads and editorial coverage.',
                 ],
         ],
         'contact' => [
@@ -2282,11 +2286,13 @@ function getStaticPages($language = null) {
                     'لدعم الموقع وطلبات التحرير: contact@example.com',
                     'للشراكات والإعلانات: partnerships@example.com',
                     'نراجع جميع الرسائل ونحاول الرد خلال يومي عمل.',
+                    'يمكنك أيضًا مراسلتنا بخصوص إزالة/تصحيح أي معلومة غير دقيقة وسنتعامل معها بسرعة.',
                 ]
                 : [
                     'For support and editorial requests, please email: contact@example.com',
                     'For ad and business inquiries, please email: partnerships@example.com',
                     'We review all messages and aim to reply within 2 business days.',
+                    'You can also contact us to request corrections or content updates, and we prioritize verified accuracy fixes quickly.',
                 ],
         ],
         'privacy' => [
@@ -2299,11 +2305,73 @@ function getStaticPages($language = null) {
                     'قد نستخدم التحليلات وتقنيات الإعلانات (مثل الكوكيز) لفهم الزيارات وتحسين التجربة.',
                     'لا نجمع عمدًا بيانات شخصية حساسة عبر الصفحات العامة، ونستخدم بيانات التواصل للرد فقط.',
                     'قد تعالج خدمات الطرف الثالث البيانات وفق سياساتها الخاصة، ويمكنك تعطيل الكوكيز من إعدادات المتصفح.',
+                    'نستخدم ملفات السجل الأساسية (مثل عنوان IP ونوع المتصفح) لأغراض الأمان ومنع إساءة الاستخدام.',
+                    'إذا طُبِّق قانون خصوصية محلي في بلدك، يمكنك التواصل معنا لطلب الوصول إلى البيانات أو حذفها متى كان ذلك متاحًا.',
                 ]
                 : [
                     'We may use analytics and advertising technologies (such as cookies and measurement scripts) to understand traffic and improve user experience.',
                     'We do not intentionally collect sensitive personal information through public pages. If you contact us directly, we only use your information to respond.',
                     'Third-party services (including ad providers) may process data according to their own privacy policies. You can disable cookies from your browser settings.',
+                    'We use basic server logs (for example IP address and browser type) for security monitoring and abuse prevention.',
+                    'Where local privacy laws apply, you may contact us to request data access, correction, or deletion when technically and legally possible.',
+                    'Advertising partners may use cookies to deliver personalized or non-personalized ads depending on your region and consent settings.',
+                ],
+        ],
+        'ad-policy' => [
+            'title' => $isArabic ? 'سياسة الإعلانات' : 'Advertising Policy',
+            'description' => $isArabic
+                ? 'كيف نعرض الإعلانات ونحافظ على فصل واضح بين الإعلان والمحتوى التحريري.'
+                : 'How ads are displayed on this site and how we separate paid placements from editorial content.',
+            'content' => $isArabic
+                ? [
+                    'قد نعرض إعلانات من أطراف خارجية مثل Google AdSense وفق سياسات المنصة.',
+                    'الإعلانات لا تؤثر على ترتيب المواضيع التحريرية أو نتائج المقارنات في المقالات.',
+                    'أي محتوى مدفوع أو شراكة تجارية يتم تمييزه بوضوح بعبارة مثل: "محتوى ممول".',
+                    'لا نعرض إعلانات منبثقة مزعجة أو أساليب خادعة تؤثر على تجربة المستخدم.',
+                    'إذا لاحظت إعلانًا مخالفًا، تواصل معنا وسنراجعه فورًا.',
+                ]
+                : [
+                    'We may display third-party ads, including Google AdSense, in accordance with partner platform policies.',
+                    'Advertising does not influence our editorial ranking, recommendations, or comparison outcomes.',
+                    'Any sponsored placement or paid collaboration is clearly labeled, for example as "Sponsored Content".',
+                    'We avoid intrusive formats (such as deceptive overlays) that harm usability or content readability.',
+                    'If you encounter a problematic ad, contact us and we will review and act quickly.',
+                ],
+        ],
+        'editorial-policy' => [
+            'title' => $isArabic ? 'السياسة التحريرية' : 'Editorial Policy',
+            'description' => $isArabic
+                ? 'معايير التحرير والمراجعة والتصحيح التي نتبعها لضمان الدقة والشفافية.'
+                : 'Editorial standards for sourcing, reviews, corrections, and transparent publishing.',
+            'content' => $isArabic
+                ? [
+                    'نراجع المحتوى قبل النشر للتحقق من الدقة وسهولة الفهم للقارئ.',
+                    'نحاول الاستناد إلى مصادر موثوقة ومحدّثة قدر الإمكان عند ذكر المواصفات والأسعار.',
+                    'إذا اكتشفنا خطأً مهمًا، نقوم بتحديث المقال وتوضيح التغيير في أسرع وقت.',
+                    'نفصل بين الرأي والتحليل الإخباري، ونميّز المحتوى الممول بوضوح.',
+                ]
+                : [
+                    'We review content before publication to improve clarity, usefulness, and factual accuracy.',
+                    'When citing specs, pricing, or safety details, we aim to use reliable and up-to-date sources.',
+                    'If a material error is identified, we update the article promptly and document the correction.',
+                    'We keep editorial judgment independent and clearly label sponsored content.',
+                ],
+        ],
+        'corrections' => [
+            'title' => $isArabic ? 'سياسة التصحيحات' : 'Corrections Policy',
+            'description' => $isArabic
+                ? 'كيف يمكنك الإبلاغ عن الأخطاء وكيف نتعامل مع طلبات التصحيح.'
+                : 'How readers can report errors and how correction requests are handled.',
+            'content' => $isArabic
+                ? [
+                    'إذا وجدت معلومة غير دقيقة، أرسل رابط الصفحة مع تفاصيل التصحيح إلى contact@example.com.',
+                    'نراجع طلبات التصحيح بحسب الأولوية، خاصة ما يتعلق بالسلامة أو الأسعار أو المواصفات.',
+                    'عند اعتماد التصحيح، يتم تحديث المحتوى في الصفحة الأصلية مع الحفاظ على وضوح السياق.',
+                ]
+                : [
+                    'If you find inaccurate information, email contact@example.com with the page URL and correction details.',
+                    'We prioritize correction requests related to safety, pricing, and product specifications.',
+                    'When a correction is confirmed, we update the original page while preserving clear reader context.',
                 ],
         ],
         'terms' => [
@@ -2316,11 +2384,15 @@ function getStaticPages($language = null) {
                     'باستخدامك للموقع فإنك توافق على استخدام المحتوى لأغراض قانونية ومعلوماتية شخصية فقط.',
                     'جميع المقالات لأغراض معرفية عامة ولا تُعد بديلاً عن الاستشارات المهنية.',
                     'قد نقوم بتحديث المحتوى والسياسات في أي وقت لضمان الجودة والامتثال.',
+                    'لا يجوز نسخ المحتوى أو إعادة نشره تجاريًا دون إذن كتابي مسبق.',
+                    'قد تتضمن بعض الصفحات روابط تابعة أو إعلانية، وقد نحصل على عمولة دون تكلفة إضافية عليك.',
                 ]
                 : [
                     'By using this website, you agree to use the content for lawful and personal informational purposes only.',
                     'All articles are provided for general information and do not replace professional legal, financial, or mechanical advice.',
                     'We may update content and site policies at any time to maintain quality, compliance, and platform requirements.',
+                    'You may not republish or commercially redistribute our content without prior written permission.',
+                    'Some pages may include affiliate or advertising links, and we may earn a commission at no extra cost to you.',
                 ],
         ],
     ];
