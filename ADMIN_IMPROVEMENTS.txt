@@ -1,0 +1,6 @@
+Admin and traffic/ads quick improvements
+- Added login CSRF check and hidden token in admin password form.
+- Added visit engagement metric (views per visitor) in admin overview and per-page table.
+- Added compact 24h visitors + tracked pages summary for easier traffic understanding.
+- Added ad readiness score (0-100) based on enablement, ad code, density safety, and blocking rules.
+- Removed duplicate categories section and fixed trending title truncation logic on homepage.

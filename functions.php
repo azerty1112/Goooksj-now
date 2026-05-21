@@ -414,7 +414,8 @@ function recordPageVisit($pageKey, $pageLabel) {
 }
 
 function getPageVisitStats($limit = 8, $search = '') {
-    $limit = max(1, min(30, (int)$limit));
+    $caps = getAppCaps();
+    $limit = max(1, min((int)$caps['page_visit_stats_max'], (int)$limit));
     $pdo = db_connect();
     if ($search !== '') {
         $stmt = $pdo->prepare("SELECT
@@ -812,7 +813,8 @@ function markQueueItemDone($id) {
 function markQueueItemForRetry($id) {
     $pdo = db_connect();
     $retryDelay = getSettingInt('queue_retry_delay_seconds', 60, 10, 3600);
-    $maxAttempts = getSettingInt('queue_max_attempts', 3, 1, 10);
+    $caps = getAppCaps();
+    $maxAttempts = getSettingInt('queue_max_attempts', 3, 1, (int)$caps['queue_max_attempts_max']);
     $now = time();
 
     $stmt = $pdo->prepare('SELECT attempts FROM scrape_queue WHERE id = ? LIMIT 1');
@@ -993,7 +995,8 @@ function getContentWorkflowSummary() {
     $selected = getSelectedContentWorkflow();
     $rssSources = (int)$pdo->query("SELECT COUNT(*) FROM rss_sources")->fetchColumn();
     $webSources = (int)$pdo->query("SELECT COUNT(*) FROM web_sources")->fetchColumn();
-    $dailyLimit = getSettingInt('daily_limit', 5, 1, 200);
+    $caps = getAppCaps();
+    $dailyLimit = getSettingInt('daily_limit', 5, 1, (int)$caps['daily_limit_max']);
 
     $selectedSources = $selected === 'web' ? $webSources : $rssSources;
     $scheduler = getAutoPublishSchedulerMeta();
@@ -1018,6 +1021,23 @@ function getContentWorkflowSummary() {
     ];
 }
 
+
+
+function getAppCaps() {
+    static $caps = null;
+    if ($caps !== null) {
+        return $caps;
+    }
+
+    $caps = [
+        'daily_limit_max' => getSettingInt('daily_limit_max', 500, 50, 5000),
+        'queue_max_attempts_max' => getSettingInt('queue_max_attempts_max', 30, 5, 100),
+        'api_per_page_max' => getSettingInt('api_per_page_max', 100, 20, 500),
+        'page_visit_stats_max' => getSettingInt('page_visit_stats_max', 100, 10, 500),
+    ];
+
+    return $caps;
+}
 
 function normalizeDateInput($value) {
     $value = trim((string)$value);
@@ -2414,8 +2434,17 @@ function generateArticle($title) {
     $imageTitle = trim($title . ' ' . ltrim($imageTitleSuffix, '- '));
     $content .= "<img src='" . htmlspecialchars($coverImage, ENT_QUOTES, 'UTF-8') . "' class='img-fluid rounded mb-4' alt='" . htmlspecialchars($imageAlt, ENT_QUOTES, 'UTF-8') . "' title='" . htmlspecialchars($imageTitle, ENT_QUOTES, 'UTF-8') . "' loading='eager' decoding='async' fetchpriority='high'>\n";
     $content .= "<p>" . getRandomIntro($title) . " This review follows an editorial structure designed to deliver deep analysis, clear comparisons, and practical buying guidance.</p>\n";
-    $content .= "<p>This {$title} review is optimized to answer the top buyer questions around performance, reliability, pricing logic, and long-term ownership value.</p>\n";
+    if ($introStyle !== 'short') {
+        $content .= "<p>This {$title} review is optimized to answer the top buyer questions around performance, reliability, pricing logic, and long-term ownership value.</p>\n";
+    }
+    if ($introStyle === 'detailed') {
+        $content .= "<p>Our editorial framework prioritizes real usage scenarios, ownership economics, and product consistency under everyday conditions.</p>\n";
+    }
     $content .= "<p><strong>Quick Take:</strong> The {$title} is a {$bodyType}-class product focused on balanced performance, everyday usability, and ownership predictability rather than one-dimensional headline metrics.</p>\n";
+    $contentToneGuide = trim((string)getSetting('content_tone_guide', ''));
+    if ($contentToneGuide !== '') {
+        $content .= "<blockquote class='small text-muted border-start ps-3 mb-3'><strong>Editorial Direction:</strong> " . htmlspecialchars($contentToneGuide, ENT_QUOTES, 'UTF-8') . "</blockquote>\n";
+    }
     $content .= "<h2>What You Will Learn in This Guide</h2>\n";
     $content .= "<ul><li>How {$title} performs in real ownership conditions, not only in launch marketing.</li><li>Which trim strategy makes the most financial sense for different buyer types.</li><li>Where {$title} stands versus competitors in comfort, tech, efficiency, and long-term value.</li></ul>\n";
 
@@ -2472,7 +2501,9 @@ function generateArticle($title) {
         }
     }
 
-    $content = preg_replace('/(<h2>What You Will Learn in This Guide<\/h2>\n<ul>.*?<\/ul>\n)/s', "$1" . buildArticleTableOfContents($tocSections) . "\n", $content, 1);
+    if ($includeToc) {
+        $content = preg_replace('/(<h2>What You Will Learn in This Guide<\/h2>\n<ul>.*?<\/ul>\n)/s', "$1" . buildArticleTableOfContents($tocSections) . "\n", $content, 1);
+    }
 
     $horsepower = rand(260, 640);
     $zeroToSixty = number_format(rand(34, 67) / 10, 1);
@@ -2484,15 +2515,23 @@ function generateArticle($title) {
     $content .= "<h2>Technical Snapshot</h2>\n";
     $content .= "<table class='table table-bordered'><tr><th>Powertrain</th><td>{$drivetrain}</td></tr><tr><th>Output</th><td>{$horsepower} hp</td></tr><tr><th>0-60 mph</th><td>{$zeroToSixty} seconds</td></tr><tr><th>Efficiency</th><td>{$efficiencyLine}</td></tr><tr><th>Editorial Category</th><td>Auto</td></tr></table>\n";
 
-    $content .= buildComparisonTable($title, $bodyType, $isEV);
+    if ($includeComparisonTable) {
+        $content .= buildComparisonTable($title, $bodyType, $isEV);
+    }
     $content .= buildBuyerPersonaSection($title, $isEV, $bodyType);
 
     $content .= "<h2>Strengths and Trade-Offs</h2>\n";
     $content .= "<ul><li><strong>Strengths:</strong> Cohesive engineering balance, strong day-to-day usability, mature technology integration, and a clear long-term value narrative.</li><li><strong>Trade-Offs:</strong> Higher entry price in premium trims, optional packages that may overlap in features, and availability pressure in high-demand regions.</li></ul>\n";
 
-    $content .= buildFaqSection($title, $isEV);
-    $content .= buildPeopleAlsoAskSection($title, $isEV);
-    $content .= buildBuyingChecklistSection($title, $isEV);
+    if ($includeFaqSection) {
+        $content .= buildFaqSection($title, $isEV);
+    }
+    if ($includePeopleAlsoAsk) {
+        $content .= buildPeopleAlsoAskSection($title, $isEV);
+    }
+    if ($includeChecklist) {
+        $content .= buildBuyingChecklistSection($title, $isEV);
+    }
 
     $content .= "<h2>Final Editorial Verdict</h2>\n";
     $content .= "<p class='mt-3'>The {$title} succeeds because it behaves like a complete product, not a collection of isolated features. It combines emotional appeal with practical intelligence, and that combination is exactly what modern buyers need in an uncertain, fast-evolving market. If your priority is a vehicle that remains convincing beyond launch-week excitement, this model is a serious and well-justified candidate.</p>";
