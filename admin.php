@@ -1317,6 +1317,58 @@ $webSql .= " ORDER BY id DESC";
         exit;
     }
 
+
+    if (isset($_POST['replace_niche_sources'])) {
+        $nicheId = (int)($_POST['niche_id'] ?? 0);
+        $type = trim((string)($_POST['source_type'] ?? 'rss')) === 'web' ? 'web' : 'rss';
+        $bulkInput = trim((string)($_POST['source_urls_bulk'] ?? ''));
+
+        if ($nicheId <= 0) {
+            $_SESSION['flash_message'] = 'Invalid niche selected.';
+            $_SESSION['flash_type'] = 'danger';
+            header('Location: admin.php#niche-management');
+            exit;
+        }
+
+        $rows = $bulkInput === '' ? [] : (preg_split('/\r\n|\r|\n/', $bulkInput) ?: []);
+        $uniqueUrls = [];
+        foreach ($rows as $row) {
+            $url = trim((string)$row);
+            if ($url === '' || !filter_var($url, FILTER_VALIDATE_URL)) {
+                continue;
+            }
+            $uniqueUrls[$url] = true;
+        }
+
+        $pdo->beginTransaction();
+        try {
+            $deleteStmt = $pdo->prepare('DELETE FROM niche_sources WHERE niche_id = ? AND type = ?');
+            $deleteStmt->execute([$nicheId, $type]);
+
+            $inserted = 0;
+            if (!empty($uniqueUrls)) {
+                $insertStmt = $pdo->prepare('INSERT INTO niche_sources (niche_id, type, url) VALUES (?, ?, ?)');
+                foreach (array_keys($uniqueUrls) as $url) {
+                    $insertStmt->execute([$nicheId, $type, $url]);
+                    $inserted++;
+                }
+            }
+            $pdo->commit();
+
+            $_SESSION['flash_message'] = strtoupper($type) . " sources replaced successfully ({$inserted} source(s)).";
+            $_SESSION['flash_type'] = 'success';
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            $_SESSION['flash_message'] = 'Could not replace niche sources. Please try again.';
+            $_SESSION['flash_type'] = 'danger';
+        }
+
+        header('Location: admin.php#niche-management');
+        exit;
+    }
+
     if (isset($_POST['remove_niche_source'])) {
         $sourceId = (int)($_POST['source_id'] ?? 0);
         if ($sourceId > 0) {
@@ -1329,6 +1381,66 @@ $webSql .= " ORDER BY id DESC";
             $_SESSION['flash_type'] = 'danger';
         }
         header('Location: admin.php');
+        exit;
+    }
+
+    if (isset($_POST['manage_niche_auto_title'])) {
+        $nicheSlug = trim((string)($_POST['niche_auto_title'] ?? ''));
+        if ($nicheSlug !== '') {
+            setSetting('active_niche', $nicheSlug);
+            $_SESSION['flash_message'] = "Auto-title editor switched to niche: {$nicheSlug}";
+            $_SESSION['flash_type'] = 'info';
+        } else {
+            $_SESSION['flash_message'] = 'Please select a niche first.';
+            $_SESSION['flash_type'] = 'warning';
+        }
+        header('Location: admin.php#auto-scheduler-section');
+        exit;
+    }
+
+    if (isset($_POST['save_niche_title_pack'])) {
+        $nicheSlug = trim((string)($_POST['niche_title_slug'] ?? ''));
+        if ($nicheSlug === '') {
+            $_SESSION['flash_message'] = 'Invalid niche for title pack update.';
+            $_SESSION['flash_type'] = 'danger';
+            header('Location: admin.php#niche-management');
+            exit;
+        }
+
+        $mode = trim((string)($_POST['niche_auto_title_mode'] ?? 'template'));
+        if (!in_array($mode, ['template', 'list'], true)) {
+            $mode = 'template';
+        }
+
+        $fields = [
+            'auto_title_fixed_titles' => (string)($_POST['niche_fixed_titles'] ?? ''),
+            'auto_title_brands' => (string)($_POST['niche_brands'] ?? ''),
+            'auto_title_models' => (string)($_POST['niche_models'] ?? ''),
+            'auto_title_modifiers' => (string)($_POST['niche_modifiers'] ?? ''),
+            'auto_title_audiences' => (string)($_POST['niche_audiences'] ?? ''),
+            'auto_title_angles' => (string)($_POST['niche_angles'] ?? ''),
+            'auto_title_templates' => (string)($_POST['niche_templates'] ?? ''),
+        ];
+
+        $prefix = 'niche.' . $nicheSlug . '.';
+        setSetting($prefix . 'auto_title_mode', $mode);
+
+        foreach ($fields as $fieldKey => $raw) {
+            $lines = preg_split('/\r\n|\r|\n/', trim($raw)) ?: [];
+            $clean = [];
+            foreach ($lines as $line) {
+                $line = trim((string)$line);
+                if ($line !== '') {
+                    $clean[] = $line;
+                }
+            }
+            $clean = array_values(array_unique($clean));
+            setSetting($prefix . $fieldKey, implode("\n", $clean));
+        }
+
+        $_SESSION['flash_message'] = 'Niche title pack updated successfully.';
+        $_SESSION['flash_type'] = 'success';
+        header('Location: admin.php#niche-management');
         exit;
     }
 
@@ -2081,6 +2193,50 @@ $settingsRows = $settingsStmt->fetchAll(PDO::FETCH_ASSOC);
                                         <button name="add_niche_source" class="btn btn-outline-light w-100">Add</button>
                                     </div>
                                 </form>
+
+
+                                <form method="post" class="row g-2 mt-2">
+                                    <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
+                                    <input type="hidden" name="niche_id" value="<?= (int)$n['id'] ?>">
+                                    <div class="col-md-3">
+                                        <select name="source_type" class="form-select">
+                                            <option value="rss">Replace RSS List</option>
+                                            <option value="web">Replace Web List</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-7">
+                                        <textarea name="source_urls_bulk" class="form-control" rows="3" placeholder="Paste one URL per line"></textarea>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <button name="replace_niche_sources" class="btn btn-outline-warning w-100" onclick="return confirm('This will replace all existing sources of this type for this niche. Continue?');">Replace</button>
+                                    </div>
+                                    <div class="col-12">
+                                        <small class="text-secondary">لكل نيش قائمة مستقلة بالكامل للمصادر. يمكنك لصق قائمة روابط كاملة وسيتم استبدالها دفعة واحدة.</small>
+                                    </div>
+                                <form method="post" class="row g-2 mt-3 border-top pt-2">
+                                    <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
+                                    <input type="hidden" name="niche_title_slug" value="<?= e($n['slug']) ?>">
+                                    <div class="col-md-2">
+                                        <select name="niche_auto_title_mode" class="form-select">
+                                            <option value="template">Template</option>
+                                            <option value="list">Fixed List</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-5">
+                                        <textarea name="niche_fixed_titles" class="form-control" rows="2" placeholder="Paste niche titles (one per line)"></textarea>
+                                    </div>
+                                    <div class="col-md-5">
+                                        <textarea name="niche_brands" class="form-control" rows="2" placeholder="Paste niche keywords/brands (one per line)"></textarea>
+                                    </div>
+                                    <div class="col-md-6"><textarea name="niche_models" class="form-control" rows="2" placeholder="Models / topics list"></textarea></div>
+                                    <div class="col-md-6"><textarea name="niche_modifiers" class="form-control" rows="2" placeholder="Modifiers e.g. guide, review"></textarea></div>
+                                    <div class="col-md-6"><textarea name="niche_audiences" class="form-control" rows="2" placeholder="Audience list"></textarea></div>
+                                    <div class="col-md-6"><textarea name="niche_angles" class="form-control" rows="2" placeholder="Angles list"></textarea></div>
+                                    <div class="col-12"><textarea name="niche_templates" class="form-control" rows="2" placeholder="Title templates with {year} {brand} {model} {modifier} {angle} {audience}"></textarea></div>
+                                    <div class="col-12">
+                                        <button name="save_niche_title_pack" value="1" class="btn btn-outline-info w-100">Save Niche Title/Keywords Pack</button>
+                                    </div>
+                                </form>
                             </div>
                         <?php endforeach; ?>
                     </div>
@@ -2272,19 +2428,7 @@ $settingsRows = $settingsStmt->fetchAll(PDO::FETCH_ASSOC);
                         </div>
                     </form>
 
-                    <?php
-                    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['manage_niche_auto_title'])) {
-                        $nicheSlug = $_POST['niche_auto_title'] ?? '';
-                        if ($nicheSlug !== '') {
-                            setSetting('active_niche', $nicheSlug);
-                            // مثال: يمكن تخصيص إعدادات العنوان التلقائي هنا لكل نيش
-                            $_SESSION['flash_message'] = "تم تفعيل إدارة العنوان التلقائي للنيش: {$nicheSlug}";
-                            $_SESSION['flash_type'] = 'info';
-                            header('Location: admin.php');
-                            exit;
-                        }
-                    }
-                    ?>
+
                                     <!-- تحسينات ذكية: عرض ملخص لكل نيش وعدد المقالات والمصادر -->
                                     <div class="mb-3">
                                         <h6 class="text-info">ملخص النيشات</h6>
