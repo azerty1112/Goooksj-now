@@ -1667,11 +1667,23 @@ Reliability, Resale, and Total Cost Breakdown",
 function getAutoTitleSetting($key) {
     $defaults = getAutoTitleDefaultSettings();
     $fallback = $defaults[$key] ?? '';
+
+    $activeNiche = trim((string)getActiveNicheSlug());
+    if ($activeNiche !== '') {
+        $nicheValue = getSetting('niche.' . $activeNiche . '.' . $key, null);
+        if ($nicheValue !== null && trim((string)$nicheValue) !== '') {
+            return (string)$nicheValue;
+        }
+    }
+
     return (string)getSetting($key, $fallback);
 }
 
 function parseSettingList($key, $fallback) {
-    $raw = (string)getSetting($key, $fallback);
+    $raw = (string)getAutoTitleSetting($key);
+    if (trim($raw) === '') {
+        $raw = (string)$fallback;
+    }
     $lines = preg_split('/\r\n|\r|\n/', $raw) ?: [];
     $clean = [];
 
@@ -1704,8 +1716,10 @@ function generateAutoTitle() {
         $mode = 'template';
     }
 
-    $minOffset = getSettingInt('auto_title_min_year_offset', 0, -1, 2);
-    $maxOffset = getSettingInt('auto_title_max_year_offset', 1, -1, 3);
+    $minOffset = (int)getAutoTitleSetting('auto_title_min_year_offset');
+    $maxOffset = (int)getAutoTitleSetting('auto_title_max_year_offset');
+    $minOffset = max(-1, min(2, $minOffset));
+    $maxOffset = max(-1, min(3, $maxOffset));
     if ($maxOffset < $minOffset) {
         [$minOffset, $maxOffset] = [$maxOffset, $minOffset];
     }

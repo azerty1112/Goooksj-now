@@ -496,9 +496,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'auto_title_fixed_titles',
         ];
 
-        setSetting('auto_title_mode', $mode);
-        setSetting('auto_title_min_year_offset', (string)$minYearOffset);
-        setSetting('auto_title_max_year_offset', (string)$maxYearOffset);
+        $activeNicheSlug = trim((string)getSetting('active_niche', 'general'));
+        $titlePrefix = 'niche.' . $activeNicheSlug . '.';
+        setSetting($titlePrefix . 'auto_title_mode', $mode);
+        setSetting($titlePrefix . 'auto_title_min_year_offset', (string)$minYearOffset);
+        setSetting($titlePrefix . 'auto_title_max_year_offset', (string)$maxYearOffset);
 
         foreach ($fields as $fieldKey) {
             $raw = trim((string)($_POST[$fieldKey] ?? ''));
@@ -534,7 +536,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             $value = implode("\n", array_values(array_unique($clean)));
-            setSetting($fieldKey, $value);
+            setSetting($titlePrefix . $fieldKey, $value);
         }
 
         $_SESSION['flash_message'] = 'Auto title generation controls updated.';
@@ -556,8 +558,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (isset($_POST['reset_auto_title_defaults'])) {
         $defaults = getAutoTitleDefaultSettings();
+        $activeNicheSlug = trim((string)getSetting('active_niche', 'general'));
+        $titlePrefix = 'niche.' . $activeNicheSlug . '.';
         foreach ($defaults as $k => $v) {
-            setSetting($k, (string)$v);
+            setSetting($titlePrefix . $k, (string)$v);
         }
         $_SESSION['flash_message'] = 'Auto title controls reset to defaults.';
         $_SESSION['flash_type'] = 'warning';
@@ -1166,19 +1170,19 @@ if ($autoPublishIntervalTo < $autoPublishIntervalFrom) {
 $autoPublishIntervalMinutes = max(1, (int)round($autoPublishInterval / 60));
 $autoPublishLastRun = (string)getSetting('auto_publish_last_run_at', '1970-01-01 00:00:00');
 $autoTitleDefaults = getAutoTitleDefaultSettings();
-$autoTitleMode = (string)getSetting('auto_title_mode', $autoTitleDefaults['auto_title_mode']);
+$autoTitleMode = (string)getAutoTitleSetting('auto_title_mode');
 if (!in_array($autoTitleMode, ['template', 'list'], true)) {
     $autoTitleMode = 'template';
 }
-$autoTitleMinYearOffset = getSettingInt('auto_title_min_year_offset', (int)$autoTitleDefaults['auto_title_min_year_offset'], -1, 2);
-$autoTitleMaxYearOffset = getSettingInt('auto_title_max_year_offset', (int)$autoTitleDefaults['auto_title_max_year_offset'], -1, 3);
-$autoTitleBrands = (string)getSetting('auto_title_brands', $autoTitleDefaults['auto_title_brands']);
-$autoTitleModels = (string)getSetting('auto_title_models', $autoTitleDefaults['auto_title_models']);
-$autoTitleModifiers = (string)getSetting('auto_title_modifiers', $autoTitleDefaults['auto_title_modifiers']);
-$autoTitleAudiences = (string)getSetting('auto_title_audiences', $autoTitleDefaults['auto_title_audiences']);
-$autoTitleAngles = (string)getSetting('auto_title_angles', $autoTitleDefaults['auto_title_angles']);
-$autoTitleTemplates = (string)getSetting('auto_title_templates', $autoTitleDefaults['auto_title_templates']);
-$autoTitleFixedTitles = (string)getSetting('auto_title_fixed_titles', $autoTitleDefaults['auto_title_fixed_titles']);
+$autoTitleMinYearOffset = max(-1, min(2, (int)getAutoTitleSetting('auto_title_min_year_offset')));
+$autoTitleMaxYearOffset = max(-1, min(3, (int)getAutoTitleSetting('auto_title_max_year_offset')));
+$autoTitleBrands = (string)getAutoTitleSetting('auto_title_brands');
+$autoTitleModels = (string)getAutoTitleSetting('auto_title_models');
+$autoTitleModifiers = (string)getAutoTitleSetting('auto_title_modifiers');
+$autoTitleAudiences = (string)getAutoTitleSetting('auto_title_audiences');
+$autoTitleAngles = (string)getAutoTitleSetting('auto_title_angles');
+$autoTitleTemplates = (string)getAutoTitleSetting('auto_title_templates');
+$autoTitleFixedTitles = (string)getAutoTitleSetting('auto_title_fixed_titles');
 $cronUrl = getCronEndpointUrl();
 $categoryOptions = $pdo->query("SELECT DISTINCT category FROM articles WHERE category IS NOT NULL AND category != '' ORDER BY category ASC")->fetchAll(PDO::FETCH_COLUMN);
 
