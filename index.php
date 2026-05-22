@@ -12,15 +12,15 @@ $uiText = [
     'privacy' => $isArabic ? 'سياسة الخصوصية' : 'Privacy Policy',
     'terms' => $isArabic ? 'الشروط' : 'Terms',
     'contact' => $isArabic ? 'تواصل معنا' : 'Contact Us',
+    'services' => $isArabic ? 'خدماتنا' : 'Services',
     'designed_for' => $isArabic ? 'مصمم لعشاق السيارات' : 'Designed for car enthusiasts',
 ];
 $baseUrl = getSiteBaseUrl();
 $siteTitle = getSiteTitle();
 $pageTitle = (string)getSetting('seo_home_title', $siteTitle);
 $pageDescription = (string)getSetting('seo_home_description', 'Automotive reviews, guides, and practical car ownership tips.');
-$canonicalUrl = $baseUrl . '/index.php';
-// always include language in canonical links
-$canonicalUrl .= (strpos($canonicalUrl, '?') === false ? '?' : '&') . 'lang=' . urlencode($language);
+$canonicalBaseUrl = $baseUrl . '/index.php';
+$canonicalUrl = $canonicalBaseUrl . (strpos($canonicalBaseUrl, '?') === false ? '?' : '&') . 'lang=' . urlencode($language);
 $openGraphType = 'website';
 $openGraphImage = null;
 $articleStructuredData = null;
@@ -115,7 +115,8 @@ if ($isFilteredListing) {
 if ($staticPage !== '') {
     $pageTitle = $staticPages[$staticPage]['title'] . ' | ' . $siteTitle;
     $pageDescription = $staticPages[$staticPage]['description'];
-    $canonicalUrl = $baseUrl . '/index.php?doc=' . rawurlencode($staticPage) . '&lang=' . urlencode($language);
+    $canonicalBaseUrl = $baseUrl . '/index.php?doc=' . rawurlencode($staticPage);
+    $canonicalUrl = $canonicalBaseUrl . '&lang=' . urlencode($language);
     $openGraphType = 'website';
     if ($defaultSocialImage !== '') {
         $openGraphImage = $defaultSocialImage;
@@ -136,7 +137,8 @@ if ($slug !== '') {
             $pageDescription = mb_substr(trim(strip_tags((string)($seoArticle['content'] ?? ''))), 0, 160);
         }
         $pageDescription = mb_substr($pageDescription, 0, 160);
-        $canonicalUrl = $baseUrl . '/index.php?slug=' . rawurlencode((string)$seoArticle['slug']) . '&lang=' . urlencode($language);
+        $canonicalBaseUrl = $baseUrl . '/index.php?slug=' . rawurlencode((string)$seoArticle['slug']);
+        $canonicalUrl = $canonicalBaseUrl . '&lang=' . urlencode($language);
         $openGraphType = 'article';
 
         $openGraphImages = [];
@@ -266,9 +268,9 @@ if ($slug === '' && $staticPage === '') {
         <meta name="msvalidate.01" content="<?= e($bingSiteVerification) ?>">
     <?php endif; ?>
     <link rel="canonical" href="<?= e($canonicalUrl) ?>">
-    <link rel="alternate" hreflang="en" href="<?= e($canonicalUrl . (str_contains($canonicalUrl, '?') ? '&' : '?') . 'lang=en') ?>">
-    <link rel="alternate" hreflang="ar" href="<?= e($canonicalUrl . (str_contains($canonicalUrl, '?') ? '&' : '?') . 'lang=ar') ?>">
-    <link rel="alternate" hreflang="x-default" href="<?= e($canonicalUrl . (str_contains($canonicalUrl, '?') ? '&' : '?') . 'lang=en') ?>">
+    <link rel="alternate" hreflang="en" href="<?= e($canonicalBaseUrl . (str_contains($canonicalBaseUrl, '?') ? '&' : '?') . 'lang=en') ?>">
+    <link rel="alternate" hreflang="ar" href="<?= e($canonicalBaseUrl . (str_contains($canonicalBaseUrl, '?') ? '&' : '?') . 'lang=ar') ?>">
+    <link rel="alternate" hreflang="x-default" href="<?= e($canonicalBaseUrl . (str_contains($canonicalBaseUrl, '?') ? '&' : '?') . 'lang=en') ?>">
     <meta property="og:title" content="<?= e($pageTitle) ?>">
     <meta property="og:description" content="<?= e($pageDescription) ?>">
     <meta property="og:type" content="<?= e($openGraphType) ?>">
@@ -311,62 +313,6 @@ if ($slug === '' && $staticPage === '') {
     <?php endif; ?>
     <?php if ($listingStructuredData): ?>
         <script type="application/ld+json"><?= json_encode($listingStructuredData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?></script>
-    <?php endif; ?>
-    <?php if ($googleAnalyticsId !== '' || $googleTagManagerId !== '' || $metaPixelId !== ''): ?>
-        <script>
-            (function () {
-                var gaId = <?= json_encode($googleAnalyticsId, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
-                var gtmId = <?= json_encode($googleTagManagerId, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
-                var pixelId = <?= json_encode($metaPixelId, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
-
-                function loadScript(src) {
-                    var script = document.createElement('script');
-                    script.async = true;
-                    script.src = src;
-                    document.head.appendChild(script);
-                }
-
-                function loadTrackingScripts() {
-                    if (gaId) {
-                        window.dataLayer = window.dataLayer || [];
-                        window.gtag = window.gtag || function(){ window.dataLayer.push(arguments); };
-                        window.gtag('js', new Date());
-                        window.gtag('config', gaId);
-                        loadScript('https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(gaId));
-                    }
-
-                    if (gtmId) {
-                        window.dataLayer = window.dataLayer || [];
-                        window.dataLayer.push({'gtm.start': new Date().getTime(), event: 'gtm.js'});
-                        loadScript('https://www.googletagmanager.com/gtm.js?id=' + encodeURIComponent(gtmId));
-                    }
-
-                    if (pixelId) {
-                        !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-                        n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
-                        n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
-                        t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window, document,'script',
-                        'https://connect.facebook.net/en_US/fbevents.js');
-                        fbq('init', pixelId);
-                        fbq('track', 'PageView');
-                    }
-                }
-
-                function deferTracking() {
-                    if ('requestIdleCallback' in window) {
-                        requestIdleCallback(loadTrackingScripts, { timeout: 2500 });
-                    } else {
-                        setTimeout(loadTrackingScripts, 1200);
-                    }
-                }
-
-                if (document.readyState === 'complete') {
-                    deferTracking();
-                } else {
-                    window.addEventListener('load', deferTracking, { once: true });
-                }
-            })();
-        </script>
     <?php endif; ?>
     <?php if ($customHeadScripts !== ''): ?>
         <?= renderCustomScripts($customHeadScripts) ?>
@@ -919,6 +865,7 @@ if ($slug === '' && $staticPage === '') {
         <a class="navbar-brand" href="index.php"><?= e($siteTitle) ?></a>
         <div class="d-flex gap-2 flex-wrap">
             <a href="index.php?doc=about&amp;lang=<?= e($language) ?>" class="btn btn-sm btn-outline-light"><?= e($uiText['about']) ?></a>
+            <a href="index.php?doc=services&amp;lang=<?= e($language) ?>" class="btn btn-sm btn-outline-light"><?= e($uiText['services']) ?></a>
             <a href="index.php?doc=privacy&amp;lang=<?= e($language) ?>" class="btn btn-sm btn-outline-light"><?= e($uiText['privacy']) ?></a>
             <a href="index.php?doc=terms&amp;lang=<?= e($language) ?>" class="btn btn-sm btn-outline-light"><?= e($uiText['terms']) ?></a>
             <a href="index.php?doc=contact&amp;lang=<?= e($language) ?>" class="btn btn-sm btn-outline-light"><?= e($uiText['contact']) ?></a>
@@ -930,6 +877,7 @@ if ($slug === '' && $staticPage === '') {
 <section class="toolbar-strip">
     <div class="container content-shell">
         <form class="toolbar-form" method="get" action="index.php">
+            <input type="hidden" name="lang" value="<?= e($language) ?>">
             <input type="search" name="q" class="form-control" placeholder="Search articles..." value="<?= e($_GET['q'] ?? '') ?>">
             <select name="sort" class="form-select" aria-label="Sort articles">
                 <option value="newest" <?= (($_GET['sort'] ?? 'newest') === 'newest') ? 'selected' : '' ?>>Newest</option>
@@ -991,6 +939,7 @@ $sortMap = [
 ];
 $orderBy = $sortMap[$sort] ?? $sortMap['newest'];
 $baseQuery = [];
+$baseQuery['lang'] = $language;
 if ($search !== '') {
     $baseQuery['q'] = $search;
 }
@@ -1420,6 +1369,7 @@ $baseQuery['per_page'] = $perPage;
     <?= e($uiText['designed_for']) ?> • <?= gmdate('Y') ?>
     <div class="footer-links">
         <a href="index.php?doc=about&amp;lang=<?= e($language) ?>"><?= e($uiText['about']) ?></a>
+        <a href="index.php?doc=services&amp;lang=<?= e($language) ?>"><?= e($uiText['services']) ?></a>
         <a href="index.php?doc=privacy&amp;lang=<?= e($language) ?>"><?= e($uiText['privacy']) ?></a>
         <a href="index.php?doc=terms&amp;lang=<?= e($language) ?>"><?= e($uiText['terms']) ?></a>
         <a href="index.php?doc=contact&amp;lang=<?= e($language) ?>"><?= e($uiText['contact']) ?></a>
@@ -1427,6 +1377,68 @@ $baseQuery['per_page'] = $perPage;
 </footer>
 </div>
 </main>
+<?php if ($googleAnalyticsId !== '' || $googleTagManagerId !== '' || $metaPixelId !== ''): ?>
+    <script>
+        (function () {
+            var gaId = <?= json_encode($googleAnalyticsId, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+            var gtmId = <?= json_encode($googleTagManagerId, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+            var pixelId = <?= json_encode($metaPixelId, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+            var trackingLoaded = false;
+
+            function loadScript(src) {
+                var script = document.createElement('script');
+                script.async = true;
+                script.src = src;
+                document.head.appendChild(script);
+            }
+
+            function loadTrackingScripts() {
+                if (trackingLoaded) {
+                    return;
+                }
+                trackingLoaded = true;
+
+                if (gaId) {
+                    window.dataLayer = window.dataLayer || [];
+                    window.gtag = window.gtag || function(){ window.dataLayer.push(arguments); };
+                    window.gtag('js', new Date());
+                    window.gtag('config', gaId, { send_page_view: gtmId ? false : true });
+                    loadScript('https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(gaId));
+                }
+
+                if (gtmId) {
+                    window.dataLayer = window.dataLayer || [];
+                    window.dataLayer.push({'gtm.start': new Date().getTime(), event: 'gtm.js'});
+                    loadScript('https://www.googletagmanager.com/gtm.js?id=' + encodeURIComponent(gtmId));
+                }
+
+                if (pixelId) {
+                    !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+                    n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
+                    n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
+                    t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window, document,'script',
+                    'https://connect.facebook.net/en_US/fbevents.js');
+                    fbq('init', pixelId);
+                    fbq('track', 'PageView');
+                }
+            }
+
+            function deferTracking() {
+                if ('requestIdleCallback' in window) {
+                    requestIdleCallback(loadTrackingScripts, { timeout: 2500 });
+                } else {
+                    setTimeout(loadTrackingScripts, 1200);
+                }
+            }
+
+            if (document.readyState === 'complete' || document.readyState === 'interactive') {
+                deferTracking();
+            } else {
+                window.addEventListener('load', deferTracking, { once: true });
+            }
+        })();
+    </script>
+<?php endif; ?>
 <?php if ($googleTagManagerId !== ''): ?>
     <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=<?= e($googleTagManagerId) ?>" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
 <?php endif; ?>
