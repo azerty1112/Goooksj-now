@@ -51,6 +51,150 @@ $pdo->exec("CREATE TABLE IF NOT EXISTS niche_sources (
     FOREIGN KEY(niche_id) REFERENCES niches(id) ON DELETE CASCADE
 )");
 
+// Default niches (ensure required niches exist on every install/update)
+$defaultNiches = [
+    ['general', 'General Automotive', 'General car news and reviews.'],
+    ['ev', 'Electric Vehicles', 'EV news, reviews and charging guides.'],
+    ['motorcycles', 'Motorcycles', 'Motorcycle news and reviews.'],
+    ['auto-mobile', 'Auto Mobile', 'Automotive mobile trends, cars and transport updates.'],
+    ['cuisine', 'Cuisine', 'Food, recipes, and restaurant-related content.'],
+    ['eran-money', 'Eran Money', 'Business, money and personal finance content.'],
+];
+$insertNicheStmt = $pdo->prepare("INSERT OR IGNORE INTO niches (slug, name, description) VALUES (?, ?, ?)");
+foreach ($defaultNiches as [$slug, $name, $description]) {
+    $insertNicheStmt->execute([$slug, $name, $description]);
+}
+
+$defaultNicheSources = [
+    'general' => [
+        'rss' => ['https://www.caranddriver.com/rss/all.xml'],
+        'web' => ['https://www.autoblog.com/news/'],
+    ],
+    'ev' => [
+        'rss' => ['https://insideevs.com/rss'],
+        'web' => ['https://insideevs.com/news/'],
+    ],
+    'motorcycles' => [
+        'rss' => ['https://www.motorcyclenews.com/rss/'],
+        'web' => [],
+    ],
+    'auto-mobile' => ['rss' => [], 'web' => []],
+    'cuisine' => ['rss' => [], 'web' => []],
+    'eran-money' => ['rss' => [], 'web' => []],
+];
+$getNicheIdStmt = $pdo->prepare("SELECT id FROM niches WHERE slug = ? LIMIT 1");
+$insertNicheSourceStmt = $pdo->prepare("INSERT OR IGNORE INTO niche_sources (niche_id, type, url) VALUES (?, ?, ?)");
+foreach ($defaultNicheSources as $slug => $groups) {
+    $getNicheIdStmt->execute([$slug]);
+    $nicheId = (int)$getNicheIdStmt->fetchColumn();
+    if ($nicheId <= 0) continue;
+    foreach (['rss', 'web'] as $type) {
+        foreach ($groups[$type] as $url) {
+            $insertNicheSourceStmt->execute([$nicheId, $type, $url]);
+        }
+    }
+}
+
+$nicheAutoTitleDefaults = [
+    'auto-mobile' => [
+        'auto_title_brands' => "Toyota
+Honda
+Hyundai
+Kia
+Ford
+Chevrolet
+Nissan
+Mazda
+BMW
+Mercedes",
+        'auto_title_models' => "Sedan
+SUV
+Crossover
+Pickup
+Hatchback
+Hybrid SUV
+Electric Sedan",
+        'auto_title_modifiers' => "Review
+Specs
+Price
+Comparison
+Buying Guide",
+        'auto_title_audiences' => "Daily Commuters
+Family Drivers
+First-Time Buyers
+Tech Drivers",
+        'auto_title_angles' => "Real-World Fuel Economy
+Comfort and Daily Use
+Technology and Safety
+Maintenance and Ownership Cost",
+        'auto_title_templates' => "{year} {brand} {model} {modifier}: {angle} for {audience}",
+    ],
+    'cuisine' => [
+        'auto_title_brands' => "Italian
+French
+Japanese
+Indian
+Turkish
+Mexican
+Mediterranean",
+        'auto_title_models' => "Home Recipe
+Street Food
+Healthy Meal
+Quick Dinner
+Dessert",
+        'auto_title_modifiers' => "Recipe
+Guide
+Tips
+Comparison
+Beginner Guide",
+        'auto_title_audiences' => "Home Cooks
+Beginners
+Busy Families
+Food Lovers",
+        'auto_title_angles' => "Step-by-Step Cooking Method
+Ingredient Substitutions
+Serving Ideas
+Budget-Friendly Plan",
+        'auto_title_templates' => "{year} {brand} {model} {modifier}: {angle} for {audience}",
+    ],
+    'eran-money' => [
+        'auto_title_brands' => "Personal Finance
+Investing
+Freelancing
+Small Business
+Side Hustle",
+        'auto_title_models' => "Savings Plan
+Budget Strategy
+Income Plan
+Investment Plan
+Debt Plan",
+        'auto_title_modifiers' => "Guide
+Checklist
+Comparison
+Roadmap
+Framework",
+        'auto_title_audiences' => "Beginners
+Young Professionals
+Families
+Freelancers",
+        'auto_title_angles' => "Risk and Return Balance
+Monthly Execution Plan
+Long-Term Growth Strategy
+Cashflow Optimization",
+        'auto_title_templates' => "{year} {brand} {model} {modifier}: {angle} for {audience}",
+    ],
+];
+$insertSettingStmt = $pdo->prepare("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)");
+foreach ($nicheAutoTitleDefaults as $slug => $settings) {
+    $insertSettingStmt->execute(['niche.' . $slug . '.auto_title_mode', 'template']);
+    $insertSettingStmt->execute(['niche.' . $slug . '.auto_title_min_year_offset', '0']);
+    $insertSettingStmt->execute(['niche.' . $slug . '.auto_title_max_year_offset', '1']);
+    $insertSettingStmt->execute(['niche.' . $slug . '.auto_title_fixed_titles', '']);
+    foreach ($settings as $k => $v) {
+        $insertSettingStmt->execute(['niche.' . $slug . '.' . $k, $v]);
+    }
+}
+
 // Tags system for better SEO and filtering
 $pdo->exec("CREATE TABLE IF NOT EXISTS tags (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
