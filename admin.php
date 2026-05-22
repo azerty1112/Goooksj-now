@@ -85,7 +85,28 @@ if (!isset($_SESSION['logged'])) {
             <small class="d-block text-secondary mt-3 text-center">Tip: set <code>ADMIN_PASSWORD</code> env var for production.</small>
         </div>
     </main>
-    </body>
+    
+<script>
+(function(){
+  const input = document.getElementById('niche-filter-input');
+  if(!input) return;
+  const quickItems = Array.from(document.querySelectorAll('.niche-quick-item'));
+  const listItems = Array.from(document.querySelectorAll('.niche-list-item'));
+  input.addEventListener('input', function(){
+    const q = (input.value || '').toLowerCase().trim();
+    quickItems.forEach(el => {
+      const txt = (el.getAttribute('data-niche-filter') || '').toLowerCase();
+      el.style.display = q === '' || txt.includes(q) ? '' : 'none';
+    });
+    listItems.forEach(el => {
+      const txt = (el.getAttribute('data-niche-filter') || '').toLowerCase();
+      el.style.display = q === '' || txt.includes(q) ? '' : 'none';
+    });
+  });
+})();
+</script>
+
+</body>
     </html>
     <?php
     exit;
@@ -1226,6 +1247,67 @@ if ($webSearch !== '') {
 }
 $webSql .= " ORDER BY id DESC";
 // Niche management POST handlers
+    if (isset($_POST['publish_multi_niches'])) {
+        $selectedNiches = $_POST['multi_niches'] ?? [];
+        $count = 0;
+        foreach ($selectedNiches as $nicheSlug) {
+            $nicheSlug = trim((string)$nicheSlug);
+            if ($nicheSlug === '') {
+                continue;
+            }
+            setSetting('active_niche', $nicheSlug);
+            $result = publishAutoArticleBySchedule(true);
+            if (($result['published'] ?? 0) === 1) {
+                $count++;
+            }
+        }
+        $_SESSION['flash_message'] = "تم النشر في {$count} نيش.";
+        $_SESSION['flash_type'] = 'success';
+        header('Location: admin.php');
+        exit;
+    }
+
+    if (isset($_POST['create_niche_preset'])) {
+        $preset = trim((string)($_POST['niche_preset'] ?? ''));
+        $presets = [
+            'auto-mobile' => ['name' => 'Auto Mobile', 'description' => 'Cars, launches, maintenance and comparison guides.'],
+            'news' => ['name' => 'News', 'description' => 'General daily news and trend coverage.'],
+            'games' => ['name' => 'Games', 'description' => 'Gaming industry news, releases and reviews.'],
+            'ev' => ['name' => 'Electric Vehicles', 'description' => 'EV news, reviews and charging guides.'],
+            'motorcycles' => ['name' => 'Motorcycles', 'description' => 'Motorcycle news and reviews.'],
+        ];
+
+        if (!isset($presets[$preset])) {
+            $_SESSION['flash_message'] = 'Invalid niche preset selected.';
+            $_SESSION['flash_type'] = 'danger';
+            header('Location: admin.php');
+            exit;
+        }
+
+        $cfg = $presets[$preset];
+        $id = \App\NicheManager::createNiche($preset, $cfg['name'], $cfg['description']);
+        if ($id > 0) {
+            $_SESSION['flash_message'] = 'Preset niche added successfully.';
+            $_SESSION['flash_type'] = 'success';
+        } else {
+            $_SESSION['flash_message'] = 'Failed to add preset niche.';
+            $_SESSION['flash_type'] = 'danger';
+        }
+        header('Location: admin.php');
+        exit;
+    }
+
+    if (isset($_POST['quick_set_niche'])) {
+        $slug = trim((string)($_POST['active_niche_quick'] ?? ''));
+        if ($slug !== '') {
+            setSetting('active_niche', $slug);
+            $_SESSION['flash_message'] = 'Active niche switched quickly.';
+            $_SESSION['flash_type'] = 'success';
+        }
+        header('Location: admin.php');
+        exit;
+    }
+
     if (isset($_POST['create_niche'])) {
         $rawSlug = trim((string)($_POST['niche_slug'] ?? ''));
         $name = trim((string)($_POST['niche_name'] ?? ''));
@@ -1951,22 +2033,21 @@ $settingsRows = $settingsStmt->fetchAll(PDO::FETCH_ASSOC);
                     document.getElementById('section-counter').textContent = `${sectionIds.indexOf(activeSection)+1}/${sectionIds.length} sections`;
                 };
             </script>
-+            
-+            <!-- ads.txt editor card -->
-+            <div class="card section-card mb-3" id="ads-txt-editor">
-+                <div class="card-body">
-+                    <h5><i class="bi bi-file-text"></i> ads.txt</h5>
-+                    <form method="post">
-+                        <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
-+                        <div class="mb-2">
-+                            <textarea name="ads_txt_content" class="form-control" rows="6" placeholder="Enter ads.txt content"><?= e($adsTxtContent) ?></textarea>
-+                        </div>
-+                        <button name="save_ads_txt" value="1" class="btn btn-outline-light btn-sm">Save ads.txt</button>
-+                    </form>
-+                    <small class="text-secondary">Modify the advertising file served at <code>/ads.txt</code>.</small>
-+                </div>
-+            </div>
-*** End Patch
+            
+            <!-- ads.txt editor card -->
+            <div class="card section-card mb-3" id="ads-txt-editor">
+                <div class="card-body">
+                    <h5><i class="bi bi-file-text"></i> ads.txt</h5>
+                    <form method="post">
+                        <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
+                        <div class="mb-2">
+                            <textarea name="ads_txt_content" class="form-control" rows="6" placeholder="Enter ads.txt content"><?= e($adsTxtContent) ?></textarea>
+                        </div>
+                        <button name="save_ads_txt" value="1" class="btn btn-outline-light btn-sm">Save ads.txt</button>
+                    </form>
+                    <small class="text-secondary">Modify the advertising file served at <code>/ads.txt</code>.</small>
+                </div>
+            </div>
             <!-- moved scripts inputs into SEO card above -->
                         <div class="col-12">
                             <label class="form-label">Meta Pixel ID</label>
@@ -1998,6 +2079,37 @@ $settingsRows = $settingsStmt->fetchAll(PDO::FETCH_ASSOC);
             <div class="card section-card mb-3" id="niche-management">
                 <div class="card-body">
                     <h5><i class="bi bi-kanban-fill"></i> Niche Management</h5>
+                    <div class="alert alert-info py-2">
+                        <strong>تبديل سريع للنيش:</strong> اختر النيش الحالي بضغطة واحدة ثم ابدأ النشر مباشرة.
+                    </div>
+
+                    <?php
+                    $nichesCount = count($nichesList);
+                    $activeNicheSlugNow = (string)getSetting('active_niche', 'general');
+                    ?>
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-4"><div class="badge bg-primary w-100 py-2">عدد النيشات: <?= (int)$nichesCount ?></div></div>
+                        <div class="col-md-4"><div class="badge bg-success w-100 py-2">النيش النشط: <?= e($activeNicheSlugNow) ?></div></div>
+                        <div class="col-md-4"><div class="badge bg-secondary w-100 py-2">إدارة أسرع + إضافة مخصصة</div></div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">بحث سريع داخل النيشات</label>
+                        <input type="text" id="niche-filter-input" class="form-control" placeholder="اكتب اسم النيش أو slug...">
+                    </div>
+
+                    <div class="d-flex flex-wrap gap-2 mb-3">
+                        <?php foreach ($nichesList as $n): ?>
+                            <form method="post" class="d-inline niche-quick-item" data-niche-filter="<?= e(strtolower($n['name'] . " " . $n['slug'])) ?>">
+                                <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
+                                <input type="hidden" name="active_niche_quick" value="<?= e($n['slug']) ?>">
+                                <button name="quick_set_niche" value="1" class="btn btn-sm <?= e((string)getSetting('active_niche', 'general')) === $n['slug'] ? 'btn-success' : 'btn-outline-info' ?>">
+                                    <?= e($n['name']) ?>
+                                </button>
+                            </form>
+                        <?php endforeach; ?>
+                    </div>
+
                     <form method="post" class="row g-2 mb-3">
                         <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
                         <div class="col-12">
@@ -2013,23 +2125,25 @@ $settingsRows = $settingsStmt->fetchAll(PDO::FETCH_ASSOC);
                         </div>
                     </form>
 
-                    <?php
-                    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['publish_multi_niches'])) {
-                        $selectedNiches = $_POST['multi_niches'] ?? [];
-                        $count = 0;
-                        foreach ($selectedNiches as $nicheSlug) {
-                            setSetting('active_niche', $nicheSlug);
-                            $result = publishAutoArticleBySchedule(true);
-                            if (($result['published'] ?? 0) === 1) {
-                                $count++;
-                            }
-                        }
-                        $_SESSION['flash_message'] = "تم النشر في {$count} نيش.";
-                        $_SESSION['flash_type'] = 'success';
-                        header('Location: admin.php');
-                        exit;
-                    }
-                    ?>
+
+
+                    <form method="post" class="row g-2 mb-3">
+                        <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
+                        <div class="col-md-8">
+                            <label class="form-label">إضافة نيش جاهز بسرعة</label>
+                            <select name="niche_preset" class="form-select">
+                                <option value="auto-mobile">Auto Mobile</option>
+                                <option value="news">News</option>
+                                <option value="games">Games</option>
+                                <option value="ev">Electric Vehicles</option>
+                                <option value="motorcycles">Motorcycles</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label d-block">&nbsp;</label>
+                            <button name="create_niche_preset" value="1" class="btn btn-outline-warning w-100">إضافة النيش الجاهز</button>
+                        </div>
+                    </form>
 
                     <form method="post" class="row g-2 mb-3">
                         <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
@@ -2037,13 +2151,16 @@ $settingsRows = $settingsStmt->fetchAll(PDO::FETCH_ASSOC);
                             <label class="form-label">Create New Niche</label>
                         </div>
                         <div class="col-4">
-                            <input type="text" name="niche_slug" class="form-control" placeholder="slug (optional)">
+                            <input type="text" name="niche_slug" class="form-control" placeholder="slug (optional) مثال: auto-mobile">
                         </div>
                         <div class="col-4">
-                            <input type="text" name="niche_name" class="form-control" placeholder="Display name" required>
+                            <input type="text" name="niche_name" class="form-control" placeholder="Display name مثال: Niche Games" required>
                         </div>
                         <div class="col-4">
-                            <input type="text" name="niche_description" class="form-control" placeholder="Short description">
+                            <input type="text" name="niche_description" class="form-control" placeholder="Short description مثال: Gaming news and reviews">
+                        </div>
+                        <div class="col-12">
+                            <small class="text-secondary">أمثلة جاهزة: <code>auto-mobile</code>, <code>news</code>, <code>games</code>, <code>ev</code>, <code>motorcycles</code>.</small>
                         </div>
                         <div class="col-12">
                             <button name="create_niche" value="1" class="btn btn-outline-light">Create Niche</button>
@@ -2070,7 +2187,7 @@ $settingsRows = $settingsStmt->fetchAll(PDO::FETCH_ASSOC);
 
                     <div class="list-group mb-3">
                         <?php foreach ($nichesList as $n): ?>
-                            <div class="list-group-item">
+                            <div class="list-group-item niche-list-item" data-niche-filter="<?= e(strtolower($n['name'] . " " . $n['slug'] . " " . $n['description'])) ?>">
                                 <div class="d-flex justify-content-between align-items-start">
                                     <div>
                                         <strong><?= e($n['name']) ?></strong>
@@ -2280,13 +2397,31 @@ $settingsRows = $settingsStmt->fetchAll(PDO::FETCH_ASSOC);
                     ?>
                                     <!-- تحسينات ذكية: عرض ملخص لكل نيش وعدد المقالات والمصادر -->
                                     <div class="mb-3">
-                                        <h6 class="text-info">ملخص النيشات</h6>
+                                        <h6 class="text-info">قائمة جاهزية النيشات والتحكم بالنوع</h6>
                                         <ul class="list-group">
                                             <?php foreach ($nichesList as $n): ?>
-                                                <li class="list-group-item d-flex justify-content-between align-items-center">
-                                                    <span><strong><?= e($n['name']) ?></strong> (<?= e($n['slug']) ?>)</span>
-                                                    <span class="badge bg-primary">مقالات: <?= (int)$pdo->query("SELECT COUNT(*) FROM articles WHERE category = '" . $n['slug'] . "'")->fetchColumn() ?></span>
-                                                    <span class="badge bg-success">مصادر: <?= (int)$pdo->query("SELECT COUNT(*) FROM niche_sources WHERE niche_id = " . (int)$n['id'])->fetchColumn() ?></span>
+                                                <?php
+                                                $nicheRssCountStmt = $pdo->prepare("SELECT COUNT(*) FROM niche_sources WHERE niche_id = ? AND type = 'rss'");
+                                                $nicheRssCountStmt->execute([(int)$n['id']]);
+                                                $nicheRssCount = (int)$nicheRssCountStmt->fetchColumn();
+
+                                                $nicheWebCountStmt = $pdo->prepare("SELECT COUNT(*) FROM niche_sources WHERE niche_id = ? AND type = 'web'");
+                                                $nicheWebCountStmt->execute([(int)$n['id']]);
+                                                $nicheWebCount = (int)$nicheWebCountStmt->fetchColumn();
+
+                                                $activeWorkflow = getSelectedContentWorkflow();
+                                                $selectedTypeCount = $activeWorkflow === 'web' ? $nicheWebCount : $nicheRssCount;
+                                                $nicheReady = $selectedTypeCount > 0;
+                                                ?>
+                                                <li class="list-group-item">
+                                                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                                                        <span><strong><?= e($n['name']) ?></strong> (<?= e($n['slug']) ?>)</span>
+                                                        <div class="d-flex flex-wrap gap-2">
+                                                            <span class="badge bg-primary">RSS: <?= (int)$nicheRssCount ?></span>
+                                                            <span class="badge bg-secondary">Web: <?= (int)$nicheWebCount ?></span>
+                                                            <span class="badge <?= $nicheReady ? 'bg-success' : 'bg-danger' ?>">جاهزية <?= strtoupper(e($activeWorkflow)) ?>: <?= $nicheReady ? 'جاهز' : 'غير جاهز' ?></span>
+                                                        </div>
+                                                    </div>
                                                 </li>
                                             <?php endforeach; ?>
                                         </ul>
@@ -2991,5 +3126,26 @@ $settingsRows = $settingsStmt->fetchAll(PDO::FETCH_ASSOC);
     });
 </script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+(function(){
+  const input = document.getElementById('niche-filter-input');
+  if(!input) return;
+  const quickItems = Array.from(document.querySelectorAll('.niche-quick-item'));
+  const listItems = Array.from(document.querySelectorAll('.niche-list-item'));
+  input.addEventListener('input', function(){
+    const q = (input.value || '').toLowerCase().trim();
+    quickItems.forEach(el => {
+      const txt = (el.getAttribute('data-niche-filter') || '').toLowerCase();
+      el.style.display = q === '' || txt.includes(q) ? '' : 'none';
+    });
+    listItems.forEach(el => {
+      const txt = (el.getAttribute('data-niche-filter') || '').toLowerCase();
+      el.style.display = q === '' || txt.includes(q) ? '' : 'none';
+    });
+  });
+})();
+</script>
+
 </body>
 </html>
