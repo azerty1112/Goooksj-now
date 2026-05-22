@@ -1694,6 +1694,20 @@ $settingsRows = $settingsStmt->fetchAll(PDO::FETCH_ASSOC);
         #auto-scheduler-section .form-label {
             color: #ff4d4f !important;
         }
+        @media (max-width: 991.98px) {
+            .dashboard-sidebar {
+                position: static;
+                max-height: none;
+                overflow: visible;
+            }
+            #control-panel-nav {
+                max-height: 35vh;
+            }
+            .panel-nav-btn {
+                font-size: 0.95rem;
+                padding: 0.55rem 0.7rem;
+            }
+        }
     </style>
 </head>
 <body class="text-light">
@@ -2992,7 +3006,16 @@ $settingsRows = $settingsStmt->fetchAll(PDO::FETCH_ASSOC);
 
     function copyToClipboard(elementId) {
         var el = document.getElementById(elementId);
-        var val = el ? (el.innerText || el.textContent) : '';
+        if (!el) return;
+
+        var val = '';
+        if ('value' in el && typeof el.value === 'string') {
+            val = el.value;
+        }
+        if (!val) {
+            val = el.innerText || el.textContent || '';
+        }
+        val = val.trim();
         if (!val) return;
         if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
             navigator.clipboard.writeText(val).then(function() {
@@ -3067,7 +3090,14 @@ $settingsRows = $settingsStmt->fetchAll(PDO::FETCH_ASSOC);
             if (!activePanel || !sourceCards[index]) return;
             currentIndex = index;
             activePanel.innerHTML = '';
-            activePanel.appendChild(sourceCards[index]);
+
+            sourceCards.forEach(function (card) {
+                card.style.display = 'none';
+            });
+
+            const selectedCard = sourceCards[index];
+            selectedCard.style.display = 'block';
+            activePanel.appendChild(selectedCard);
 
             panelNav.querySelectorAll('button').forEach(function (btn) {
                 const isActive = Number(btn.dataset.index) === index;
