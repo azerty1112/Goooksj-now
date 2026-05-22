@@ -89,6 +89,36 @@ class NicheManager
                     'https://www.motorcyclenews.com/rss/'
                 ],
                 'web' => []
+            ],
+            'auto-mobile' => [
+                'name' => 'Auto Mobile',
+                'description' => 'Cars, launches, maintenance and comparison guides.',
+                'rss' => [
+                    'https://www.autoblog.com/rss.xml'
+                ],
+                'web' => [
+                    'https://www.caranddriver.com/news/'
+                ]
+            ],
+            'news' => [
+                'name' => 'News',
+                'description' => 'General daily news and trend coverage.',
+                'rss' => [
+                    'http://feeds.bbci.co.uk/news/rss.xml'
+                ],
+                'web' => [
+                    'https://www.reuters.com/world/'
+                ]
+            ],
+            'games' => [
+                'name' => 'Games',
+                'description' => 'Gaming industry news, releases and reviews.',
+                'rss' => [
+                    'https://www.ign.com/rss'
+                ],
+                'web' => [
+                    'https://www.gamespot.com/news/'
+                ]
             ]
         ];
 
