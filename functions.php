@@ -2277,29 +2277,29 @@ function getStaticPages($language = null) {
         if ($nicheName === '') {
             continue;
         }
+
         $rssSources = $nicheSlug !== '' ? getNicheRssSources($nicheSlug) : [];
         $webSources = $nicheSlug !== '' ? getNicheWebSources($nicheSlug) : [];
         $rssCount = count($rssSources);
         $webCount = count($webSources);
         $sampleRss = $rssCount > 0 ? (string)$rssSources[0] : '';
         $sampleWeb = $webCount > 0 ? (string)$webSources[0] : '';
+        $nicheTitle = $nicheName . ($nicheSlug !== '' ? ' (' . $nicheSlug . ')' : '');
 
         if ($isArabic) {
-            $nicheServicesContent[] = 'نيش "' . $nicheName . '"' . ($nicheSlug !== '' ? ' (' . $nicheSlug . ')' : '') . ': خدمة استراتيجية متخصصة لتحديد فرص النمو وصياغة خطة نشر شهرية قابلة للقياس.';
-            $nicheServicesContent[] = 'وصف النيش: ' . ($nicheDesc !== '' ? $nicheDesc : 'لا يوجد وصف مضاف حاليًا، ويمكننا صياغة وصف احترافي موجّه للجمهور المستهدف.');
-            $nicheServicesContent[] = 'تحليل المصادر الحالية لهذا النيش: RSS=' . $rssCount . ' وWeb=' . $webCount . '، مع توصيات لزيادة التغطية في حال كانت المصادر محدودة.';
-            $nicheServicesContent[] = $sampleRss !== '' ? 'عينة RSS: ' . $sampleRss : 'لا توجد عينة RSS حالياً لهذا النيش.';
-            $nicheServicesContent[] = $sampleWeb !== '' ? 'عينة Web: ' . $sampleWeb : 'لا توجد عينة Web حالياً لهذا النيش.';
-            $nicheServicesContent[] = 'خدماتنا التنفيذية لهذا النيش تشمل: تخطيط موضوعات أسبوعية، كتابة محتوى متوافق مع SEO، تحسين العناوين والوصف، بناء ربط داخلي ذكي، ومتابعة الأداء بمؤشرات واضحة.';
-            $nicheServicesContent[] = 'خدمات التطوير المستمر: تحديث المقالات القديمة، تحسين CTR من نتائج البحث، توسيع الكلمات المفتاحية الطويلة، وتحديث خطة المحتوى حسب تغيرات السوق.';
+            $nicheServicesContent[] = 'نيش "' . $nicheTitle . '": نوفّر له إطار عمل متكامل للنمو يشمل التخطيط التحريري، تحسين الظهور في البحث، وقياس النتائج.';
+            $nicheServicesContent[] = 'الوصف: ' . ($nicheDesc !== '' ? $nicheDesc : 'لا يوجد وصف حاليًا، ويمكننا صياغة وصف احترافي موجّه بدقة للجمهور المستهدف.');
+            $nicheServicesContent[] = 'الجاهزية الحالية للمصادر: RSS=' . $rssCount . ' | Web=' . $webCount . '.';
+            $nicheServicesContent[] = $sampleRss !== '' ? 'أقوى مصدر RSS مقترح: ' . $sampleRss : 'لا يوجد مصدر RSS مضاف حاليًا.';
+            $nicheServicesContent[] = $sampleWeb !== '' ? 'أقوى مصدر Web مقترح: ' . $sampleWeb : 'لا يوجد مصدر Web مضاف حاليًا.';
+            $nicheServicesContent[] = 'خطة AF (Attract & Follow-up): جذب الزوار عبر مواضيع دقيقة، ثم متابعة الأداء أسبوعيًا لتطوير خطة المحتوى وتحسين التحويل.';
         } else {
-            $nicheServicesContent[] = 'Niche "' . $nicheName . '"' . ($nicheSlug !== '' ? ' (' . $nicheSlug . ')' : '') . ': specialized strategy service for identifying growth opportunities and defining a measurable monthly publishing roadmap.';
-            $nicheServicesContent[] = 'Niche description: ' . ($nicheDesc !== '' ? $nicheDesc : 'No description is currently configured; we can craft a professional audience-focused description.');
-            $nicheServicesContent[] = 'Current source coverage for this niche: RSS=' . $rssCount . ', Web=' . $webCount . ', with clear recommendations to expand coverage when source availability is limited.';
-            $nicheServicesContent[] = $sampleRss !== '' ? 'RSS sample: ' . $sampleRss : 'No RSS sample is currently available for this niche.';
-            $nicheServicesContent[] = $sampleWeb !== '' ? 'Web sample: ' . $sampleWeb : 'No Web sample is currently available for this niche.';
-            $nicheServicesContent[] = 'Execution services for this niche include weekly topic planning, SEO-ready content production, title/meta optimization, smart internal linking, and KPI-driven performance tracking.';
-            $nicheServicesContent[] = 'Continuous growth services include refreshing older articles, improving search CTR, expanding long-tail keyword coverage, and adapting the content roadmap to market changes.';
+            $nicheServicesContent[] = 'Niche "' . $nicheTitle . '": we provide a complete growth framework across editorial planning, search visibility optimization, and measurable performance tracking.';
+            $nicheServicesContent[] = 'Description: ' . ($nicheDesc !== '' ? $nicheDesc : 'No description is configured yet; we can craft a focused, audience-specific positioning summary.');
+            $nicheServicesContent[] = 'Current source readiness: RSS=' . $rssCount . ' | Web=' . $webCount . '.';
+            $nicheServicesContent[] = $sampleRss !== '' ? 'Top suggested RSS source: ' . $sampleRss : 'No RSS source is currently configured.';
+            $nicheServicesContent[] = $sampleWeb !== '' ? 'Top suggested Web source: ' . $sampleWeb : 'No Web source is currently configured.';
+            $nicheServicesContent[] = 'AF plan (Attract & Follow-up): attract qualified traffic through precise topic clusters, then run weekly follow-up optimization to improve reach and conversion.';
         }
     }
     if (empty($nicheServicesContent)) {
