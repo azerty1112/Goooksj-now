@@ -313,62 +313,6 @@ if ($slug === '' && $staticPage === '') {
     <?php if ($listingStructuredData): ?>
         <script type="application/ld+json"><?= json_encode($listingStructuredData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?></script>
     <?php endif; ?>
-    <?php if ($googleAnalyticsId !== '' || $googleTagManagerId !== '' || $metaPixelId !== ''): ?>
-        <script>
-            (function () {
-                var gaId = <?= json_encode($googleAnalyticsId, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
-                var gtmId = <?= json_encode($googleTagManagerId, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
-                var pixelId = <?= json_encode($metaPixelId, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
-
-                function loadScript(src) {
-                    var script = document.createElement('script');
-                    script.async = true;
-                    script.src = src;
-                    document.head.appendChild(script);
-                }
-
-                function loadTrackingScripts() {
-                    if (gaId) {
-                        window.dataLayer = window.dataLayer || [];
-                        window.gtag = window.gtag || function(){ window.dataLayer.push(arguments); };
-                        window.gtag('js', new Date());
-                        window.gtag('config', gaId);
-                        loadScript('https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(gaId));
-                    }
-
-                    if (gtmId) {
-                        window.dataLayer = window.dataLayer || [];
-                        window.dataLayer.push({'gtm.start': new Date().getTime(), event: 'gtm.js'});
-                        loadScript('https://www.googletagmanager.com/gtm.js?id=' + encodeURIComponent(gtmId));
-                    }
-
-                    if (pixelId) {
-                        !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-                        n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
-                        n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
-                        t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window, document,'script',
-                        'https://connect.facebook.net/en_US/fbevents.js');
-                        fbq('init', pixelId);
-                        fbq('track', 'PageView');
-                    }
-                }
-
-                function deferTracking() {
-                    if ('requestIdleCallback' in window) {
-                        requestIdleCallback(loadTrackingScripts, { timeout: 2500 });
-                    } else {
-                        setTimeout(loadTrackingScripts, 1200);
-                    }
-                }
-
-                if (document.readyState === 'complete') {
-                    deferTracking();
-                } else {
-                    window.addEventListener('load', deferTracking, { once: true });
-                }
-            })();
-        </script>
-    <?php endif; ?>
     <?php if ($customHeadScripts !== ''): ?>
         <?= renderCustomScripts($customHeadScripts) ?>
     <?php endif; ?>
@@ -1428,6 +1372,62 @@ $baseQuery['per_page'] = $perPage;
 </footer>
 </div>
 </main>
+<?php if ($googleAnalyticsId !== '' || $googleTagManagerId !== '' || $metaPixelId !== ''): ?>
+    <script>
+        (function () {
+            var gaId = <?= json_encode($googleAnalyticsId, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+            var gtmId = <?= json_encode($googleTagManagerId, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+            var pixelId = <?= json_encode($metaPixelId, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+
+            function loadScript(src) {
+                var script = document.createElement('script');
+                script.async = true;
+                script.src = src;
+                document.head.appendChild(script);
+            }
+
+            function loadTrackingScripts() {
+                if (gaId) {
+                    window.dataLayer = window.dataLayer || [];
+                    window.gtag = window.gtag || function(){ window.dataLayer.push(arguments); };
+                    window.gtag('js', new Date());
+                    window.gtag('config', gaId);
+                    loadScript('https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(gaId));
+                }
+
+                if (gtmId) {
+                    window.dataLayer = window.dataLayer || [];
+                    window.dataLayer.push({'gtm.start': new Date().getTime(), event: 'gtm.js'});
+                    loadScript('https://www.googletagmanager.com/gtm.js?id=' + encodeURIComponent(gtmId));
+                }
+
+                if (pixelId) {
+                    !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+                    n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
+                    n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
+                    t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window, document,'script',
+                    'https://connect.facebook.net/en_US/fbevents.js');
+                    fbq('init', pixelId);
+                    fbq('track', 'PageView');
+                }
+            }
+
+            function deferTracking() {
+                if ('requestIdleCallback' in window) {
+                    requestIdleCallback(loadTrackingScripts, { timeout: 2500 });
+                } else {
+                    setTimeout(loadTrackingScripts, 1200);
+                }
+            }
+
+            if (document.readyState === 'complete') {
+                deferTracking();
+            } else {
+                window.addEventListener('load', deferTracking, { once: true });
+            }
+        })();
+    </script>
+<?php endif; ?>
 <?php if ($googleTagManagerId !== ''): ?>
     <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=<?= e($googleTagManagerId) ?>" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
 <?php endif; ?>
