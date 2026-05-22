@@ -89,6 +89,25 @@ class NicheManager
                     'https://www.motorcyclenews.com/rss/'
                 ],
                 'web' => []
+            ],
+
+            'auto-mobile' => [
+                'name' => 'Auto Mobile',
+                'description' => 'Automotive mobile trends, cars and transport updates.',
+                'rss' => [],
+                'web' => []
+            ],
+            'cuisine' => [
+                'name' => 'Cuisine',
+                'description' => 'Food, recipes, and restaurant-related content.',
+                'rss' => [],
+                'web' => []
+            ],
+            'eran-money' => [
+                'name' => 'Eran Money',
+                'description' => 'Business, money and personal finance content.',
+                'rss' => [],
+                'web' => []
             ]
         ];
 
