@@ -672,6 +672,115 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
+    if (isset($_POST['add_source_smart'])) {
+        $smartUrl = trim((string)($_POST['smart_source_url'] ?? ''));
+        $smartUrlsBulk = trim((string)($_POST['smart_source_urls'] ?? ''));
+        $smartNicheSlug = trim((string)($_POST['smart_target_niche_slug'] ?? ''));
+        $smartType = trim((string)($_POST['smart_source_type'] ?? 'auto'));
+
+        $normalizeSmartUrl = static function ($url) {
+            $url = trim((string)$url);
+            if ($url === '') return '';
+            $parts = parse_url($url);
+            if (!is_array($parts)) return $url;
+            $scheme = strtolower((string)($parts['scheme'] ?? ''));
+            $host = strtolower((string)($parts['host'] ?? ''));
+            $port = isset($parts['port']) ? ':' . (int)$parts['port'] : '';
+            $path = (string)($parts['path'] ?? '/');
+            if ($path === '') $path = '/';
+            if ($path !== '/') $path = rtrim($path, '/');
+            $query = (string)($parts['query'] ?? '');
+            if ($query !== '') {
+                parse_str($query, $queryParams);
+                foreach (array_keys($queryParams) as $k) {
+                    if (preg_match('/^(utm_|fbclid|gclid|mc_cid|mc_eid)/i', (string)$k)) {
+                        unset($queryParams[$k]);
+                    }
+                }
+                ksort($queryParams);
+                $query = $queryParams ? ('?' . http_build_query($queryParams)) : '';
+            }
+            return $scheme . '://' . $host . $port . $path . $query;
+        };
+
+        $urls = [];
+        if ($smartUrl !== '') $urls[] = $smartUrl;
+        if ($smartUrlsBulk !== '') {
+            foreach ((preg_split('/\r\n|\r|\n/', $smartUrlsBulk) ?: []) as $line) {
+                $line = trim((string)$line);
+                if ($line !== '') $urls[] = $line;
+            }
+        }
+        $urls = array_map($normalizeSmartUrl, $urls);
+        $urls = array_values(array_unique(array_filter($urls, static fn($u) => $u !== '')));
+        if (!$urls) {
+            $_SESSION['flash_message'] = 'Smart add failed: please provide at least one URL.';
+            $_SESSION['flash_type'] = 'danger';
+            header('Location: admin.php#auto-scheduler-section');
+            exit;
+        }
+
+        if (!in_array($smartType, ['auto', 'rss', 'web'], true)) {
+            $smartType = 'auto';
+        }
+        $targetNicheId = 0;
+        if ($smartNicheSlug !== '' && class_exists('App\\NicheManager')) {
+            $targetNiche = \App\NicheManager::getNicheBySlug($smartNicheSlug);
+            if ($targetNiche) $targetNicheId = (int)($targetNiche['id'] ?? 0);
+        }
+
+        $insRss = $pdo->prepare("INSERT OR IGNORE INTO rss_sources (url) VALUES (?)");
+        $insWeb = $pdo->prepare("INSERT OR IGNORE INTO web_sources (url) VALUES (?)");
+        $existsNiche = $pdo->prepare("SELECT id FROM niche_sources WHERE niche_id = ? AND type = ? AND url = ? LIMIT 1");
+
+        $isPreview = isset($_POST['smart_source_preview']) && (string)($_POST['smart_source_preview'] === '1');
+        $addedRss = 0; $addedWeb = 0; $linked = 0; $invalid = 0; $dupeGlobal = 0;
+        $detectedRss = 0; $detectedWeb = 0;
+        $invalidExamples = [];
+        foreach ($urls as $u) {
+            if (!filter_var($u, FILTER_VALIDATE_URL)) {
+                $invalid++;
+                if (count($invalidExamples) < 3) $invalidExamples[] = $u;
+                continue;
+            }
+            $type = $smartType;
+            if ($type === 'auto') {
+                $path = strtolower((string)parse_url($u, PHP_URL_PATH));
+                $query = strtolower((string)parse_url($u, PHP_URL_QUERY));
+                $type = (strpos($path, 'feed') !== false || str_ends_with($path, '.xml') || str_ends_with($path, '.rss') || str_ends_with($path, '.atom') || strpos($query, 'feed=') !== false)
+                    ? 'rss' : 'web';
+            }
+            if ($type === 'rss') $detectedRss++; else $detectedWeb++;
+            if ($isPreview) continue;
+            if ($type === 'rss') {
+                $insRss->execute([$u]);
+                $addedRss += $insRss->rowCount() > 0 ? 1 : 0;
+                $dupeGlobal += $insRss->rowCount() > 0 ? 0 : 1;
+            } else {
+                $insWeb->execute([$u]);
+                $addedWeb += $insWeb->rowCount() > 0 ? 1 : 0;
+                $dupeGlobal += $insWeb->rowCount() > 0 ? 0 : 1;
+            }
+            if ($targetNicheId > 0 && class_exists('App\\NicheManager')) {
+                $existsNiche->execute([$targetNicheId, $type, $u]);
+                if (!$existsNiche->fetchColumn()) {
+                    \App\NicheManager::addSource($targetNicheId, $type, $u);
+                    $linked++;
+                }
+            }
+        }
+
+        $_SESSION['flash_message'] = ($isPreview ? "Smart preview only. " : "Smart merge done. ")
+            . "Detected RSS={$detectedRss}, Web={$detectedWeb}. "
+            . ($isPreview ? '' : "Added RSS={$addedRss}, Web={$addedWeb}. ")
+            . ($dupeGlobal > 0 ? "Global duplicates skipped={$dupeGlobal}. " : '')
+            . ($targetNicheId > 0 ? "Niche linked={$linked}. " : ($smartNicheSlug !== '' ? 'Niche not found. ' : ''))
+            . ($invalid > 0 ? "Invalid URL(s)={$invalid}" . (!empty($invalidExamples) ? ' [' . implode(' | ', $invalidExamples) . ']' : '') . '.' : '');
+        $_SESSION['flash_type'] = $isPreview ? 'info' : (($addedRss + $addedWeb + $linked) > 0 ? 'success' : 'warning');
+        header('Location: admin.php#auto-scheduler-section');
+        exit;
+    }
+
     if (isset($_POST['add_rss'])) {
         $singleUrl = trim($_POST['rss_url'] ?? '');
         $bulkInput = trim($_POST['rss_urls'] ?? '');
@@ -696,7 +805,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
 
+        $targetNicheSlug = trim((string)($_POST['rss_target_niche_slug'] ?? ''));
+        $targetNicheId = 0;
+        if ($targetNicheSlug !== '' && class_exists('App\\NicheManager')) {
+            $targetNiche = \App\NicheManager::getNicheBySlug($targetNicheSlug);
+            if ($targetNiche) {
+                $targetNicheId = (int)($targetNiche['id'] ?? 0);
+            }
+        }
+
         $inserted = 0;
+        $linkedToNiche = 0;
         $invalid = 0;
         $stmt = $pdo->prepare("INSERT OR IGNORE INTO rss_sources (url) VALUES (?)");
         foreach ($rawUrls as $url) {
@@ -709,13 +828,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($stmt->rowCount() > 0) {
                 $inserted++;
             }
+
+            if ($targetNicheId > 0 && class_exists('App\\NicheManager')) {
+                $existsStmt = $pdo->prepare("SELECT id FROM niche_sources WHERE niche_id = ? AND type = 'rss' AND url = ? LIMIT 1");
+                $existsStmt->execute([$targetNicheId, $url]);
+                if (!$existsStmt->fetchColumn()) {
+                    \App\NicheManager::addSource($targetNicheId, 'rss', $url);
+                    $linkedToNiche++;
+                }
+            }
         }
 
         $ignored = count($rawUrls) - $inserted - $invalid;
         if ($inserted > 0) {
             $_SESSION['flash_message'] = "Added {$inserted} RSS source(s)."
                 . ($ignored > 0 ? " {$ignored} duplicate(s) skipped." : '')
-                . ($invalid > 0 ? " {$invalid} invalid link(s) skipped." : '');
+                . ($invalid > 0 ? " {$invalid} invalid link(s) skipped." : '')
+                . ($linkedToNiche > 0 ? " Linked {$linkedToNiche} source(s) to niche workflow." : '');
             $_SESSION['flash_type'] = 'success';
         } else {
             $_SESSION['flash_message'] = $invalid > 0
@@ -766,7 +895,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
 
+        $targetNicheSlug = trim((string)($_POST['web_target_niche_slug'] ?? ''));
+        $targetNicheId = 0;
+        if ($targetNicheSlug !== '' && class_exists('App\\NicheManager')) {
+            $targetNiche = \App\NicheManager::getNicheBySlug($targetNicheSlug);
+            if ($targetNiche) {
+                $targetNicheId = (int)($targetNiche['id'] ?? 0);
+            }
+        }
+
         $inserted = 0;
+        $linkedToNiche = 0;
         $invalid = 0;
         $stmt = $pdo->prepare("INSERT OR IGNORE INTO web_sources (url) VALUES (?)");
         foreach ($rawUrls as $url) {
@@ -779,13 +918,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($stmt->rowCount() > 0) {
                 $inserted++;
             }
+
+            if ($targetNicheId > 0 && class_exists('App\\NicheManager')) {
+                $existsStmt = $pdo->prepare("SELECT id FROM niche_sources WHERE niche_id = ? AND type = 'web' AND url = ? LIMIT 1");
+                $existsStmt->execute([$targetNicheId, $url]);
+                if (!$existsStmt->fetchColumn()) {
+                    \App\NicheManager::addSource($targetNicheId, 'web', $url);
+                    $linkedToNiche++;
+                }
+            }
         }
 
         $ignored = count($rawUrls) - $inserted - $invalid;
         if ($inserted > 0) {
             $_SESSION['flash_message'] = "Added {$inserted} normal website source(s)."
                 . ($ignored > 0 ? " {$ignored} duplicate(s) skipped." : '')
-                . ($invalid > 0 ? " {$invalid} invalid link(s) skipped." : '');
+                . ($invalid > 0 ? " {$invalid} invalid link(s) skipped." : '')
+                . ($linkedToNiche > 0 ? " Linked {$linkedToNiche} source(s) to niche workflow." : '');
             $_SESSION['flash_type'] = 'success';
         } else {
             $_SESSION['flash_message'] = $invalid > 0
@@ -2425,6 +2574,66 @@ $settingsRows = $settingsStmt->fetchAll(PDO::FETCH_ASSOC);
                     </div>
 
                     <hr class="border-secondary-subtle my-3">
+                    <h6><i class="bi bi-link-45deg"></i> Quick Source Merge (RSS + Web + Niche)</h6>
+                    <form method="post" class="row g-2 mb-3">
+                        <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
+                        <div class="col-md-5">
+                            <input type="url" name="smart_source_url" class="form-control" placeholder="https://example.com/feed.xml or /news/">
+                            <textarea name="smart_source_urls" class="form-control mt-2" rows="2" placeholder="Bulk URLs (one per line)"></textarea>
+                        </div>
+                        <div class="col-md-3">
+                            <select name="smart_source_type" class="form-select">
+                                <option value="auto">Auto Detect Type</option>
+                                <option value="rss">Force RSS</option>
+                                <option value="web">Force Web</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <select name="smart_target_niche_slug" class="form-select">
+                                <option value="">Optional niche link</option>
+                                <?php foreach ($nichesList as $n): ?>
+                                    <option value="<?= e($n['slug']) ?>"><?= e($n['name']) ?> (<?= e($n['slug']) ?>)</option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-1">
+                            <button name="add_source_smart" value="1" class="btn btn-warning w-100" onclick="this.form.smart_source_preview.value='0';">Add</button>
+                            <button name="add_source_smart" value="1" class="btn btn-outline-info w-100 mt-2" onclick="this.form.smart_source_preview.value='1';">Preview</button>
+                            <input type="hidden" name="smart_source_preview" value="0">
+                        </div>
+                    </form>
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <form method="post" class="p-2 border rounded border-secondary-subtle">
+                                <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
+                                <label class="form-label small mb-1">Add RSS Source to Hub</label>
+                                <input type="url" name="rss_url" class="form-control form-control-sm" placeholder="https://example.com/feed.xml" required>
+                                <select name="rss_target_niche_slug" class="form-select form-select-sm mt-2">
+                                    <option value="">Global only (no niche link)</option>
+                                    <?php foreach ($nichesList as $n): ?>
+                                        <option value="<?= e($n['slug']) ?>"><?= e($n['name']) ?> (<?= e($n['slug']) ?>)</option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <button name="add_rss" class="btn btn-outline-warning btn-sm w-100 mt-2">Add RSS Source</button>
+                            </form>
+                        </div>
+                        <div class="col-md-6">
+                            <form method="post" class="p-2 border rounded border-secondary-subtle">
+                                <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
+                                <label class="form-label small mb-1">Add Normal Website Source to Hub</label>
+                                <input type="url" name="web_url" class="form-control form-control-sm" placeholder="https://example.com/news/" required>
+                                <select name="web_target_niche_slug" class="form-select form-select-sm mt-2">
+                                    <option value="">Global only (no niche link)</option>
+                                    <?php foreach ($nichesList as $n): ?>
+                                        <option value="<?= e($n['slug']) ?>"><?= e($n['name']) ?> (<?= e($n['slug']) ?>)</option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <button name="add_web" class="btn btn-outline-warning btn-sm w-100 mt-2">Add Website Source</button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <hr class="border-secondary-subtle my-3">
                     <h6><i class="bi bi-sliders"></i> Advanced Scheduler + Title Controls</h6>
                     <form method="post" class="row g-2 align-items-end mb-3">
                         <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
@@ -2622,6 +2831,12 @@ $settingsRows = $settingsStmt->fetchAll(PDO::FETCH_ASSOC);
                     <form method="post">
                         <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
                         <input type="url" name="rss_url" class="form-control" placeholder="https://example.com/feed.xml">
+                        <select name="rss_target_niche_slug" class="form-select mt-2">
+                            <option value="">Optional: Link to niche</option>
+                            <?php foreach ($nichesList as $n): ?>
+                                <option value="<?= e($n['slug']) ?>"><?= e($n['name']) ?> (<?= e($n['slug']) ?>)</option>
+                            <?php endforeach; ?>
+                        </select>
                         <textarea name="rss_urls" class="form-control mt-2" rows="5" placeholder="Paste multiple RSS/XML links (one per line)"></textarea>
                         <small class="text-secondary d-block mt-2">You can add a single URL above or paste a full XML links list.</small>
                         <button name="add_rss" class="btn btn-outline-light mt-3 w-100">Save Source(s)</button>
@@ -2635,6 +2850,12 @@ $settingsRows = $settingsStmt->fetchAll(PDO::FETCH_ASSOC);
                     <form method="post">
                         <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
                         <input type="url" name="web_url" class="form-control" placeholder="https://example.com/news/">
+                        <select name="web_target_niche_slug" class="form-select mt-2">
+                            <option value="">Optional: Link to niche</option>
+                            <?php foreach ($nichesList as $n): ?>
+                                <option value="<?= e($n['slug']) ?>"><?= e($n['name']) ?> (<?= e($n['slug']) ?>)</option>
+                            <?php endforeach; ?>
+                        </select>
                         <textarea name="web_urls" class="form-control mt-2" rows="5" placeholder="Paste multiple normal website links (one per line)"></textarea>
                         <small class="text-secondary d-block mt-2">Used by Normal Sites workflow with Symfony DomCrawler + CSS selectors.</small>
                         <button name="add_web" class="btn btn-outline-light mt-3 w-100">Save Website Source(s)</button>
