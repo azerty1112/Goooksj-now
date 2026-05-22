@@ -2268,6 +2268,45 @@ function getStaticPages($language = null) {
         $language = detectPreferredLanguage();
     }
     $isArabic = $language === 'ar';
+    $nicheServicesContent = [];
+    $niches = listNiches();
+    foreach ($niches as $niche) {
+        $nicheName = trim((string)($niche['name'] ?? ''));
+        $nicheSlug = trim((string)($niche['slug'] ?? ''));
+        $nicheDesc = trim((string)($niche['description'] ?? ''));
+        if ($nicheName === '') {
+            continue;
+        }
+        $rssSources = $nicheSlug !== '' ? getNicheRssSources($nicheSlug) : [];
+        $webSources = $nicheSlug !== '' ? getNicheWebSources($nicheSlug) : [];
+        $rssCount = count($rssSources);
+        $webCount = count($webSources);
+        $sampleRss = $rssCount > 0 ? (string)$rssSources[0] : '';
+        $sampleWeb = $webCount > 0 ? (string)$webSources[0] : '';
+
+        if ($isArabic) {
+            $nicheServicesContent[] = 'نيش "' . $nicheName . '"' . ($nicheSlug !== '' ? ' (' . $nicheSlug . ')' : '') . ': خدمة استراتيجية متخصصة لتحديد فرص النمو وصياغة خطة نشر شهرية قابلة للقياس.';
+            $nicheServicesContent[] = 'وصف النيش: ' . ($nicheDesc !== '' ? $nicheDesc : 'لا يوجد وصف مضاف حاليًا، ويمكننا صياغة وصف احترافي موجّه للجمهور المستهدف.');
+            $nicheServicesContent[] = 'تحليل المصادر الحالية لهذا النيش: RSS=' . $rssCount . ' وWeb=' . $webCount . '، مع توصيات لزيادة التغطية في حال كانت المصادر محدودة.';
+            $nicheServicesContent[] = $sampleRss !== '' ? 'عينة RSS: ' . $sampleRss : 'لا توجد عينة RSS حالياً لهذا النيش.';
+            $nicheServicesContent[] = $sampleWeb !== '' ? 'عينة Web: ' . $sampleWeb : 'لا توجد عينة Web حالياً لهذا النيش.';
+            $nicheServicesContent[] = 'خدماتنا التنفيذية لهذا النيش تشمل: تخطيط موضوعات أسبوعية، كتابة محتوى متوافق مع SEO، تحسين العناوين والوصف، بناء ربط داخلي ذكي، ومتابعة الأداء بمؤشرات واضحة.';
+            $nicheServicesContent[] = 'خدمات التطوير المستمر: تحديث المقالات القديمة، تحسين CTR من نتائج البحث، توسيع الكلمات المفتاحية الطويلة، وتحديث خطة المحتوى حسب تغيرات السوق.';
+        } else {
+            $nicheServicesContent[] = 'Niche "' . $nicheName . '"' . ($nicheSlug !== '' ? ' (' . $nicheSlug . ')' : '') . ': specialized strategy service for identifying growth opportunities and defining a measurable monthly publishing roadmap.';
+            $nicheServicesContent[] = 'Niche description: ' . ($nicheDesc !== '' ? $nicheDesc : 'No description is currently configured; we can craft a professional audience-focused description.');
+            $nicheServicesContent[] = 'Current source coverage for this niche: RSS=' . $rssCount . ', Web=' . $webCount . ', with clear recommendations to expand coverage when source availability is limited.';
+            $nicheServicesContent[] = $sampleRss !== '' ? 'RSS sample: ' . $sampleRss : 'No RSS sample is currently available for this niche.';
+            $nicheServicesContent[] = $sampleWeb !== '' ? 'Web sample: ' . $sampleWeb : 'No Web sample is currently available for this niche.';
+            $nicheServicesContent[] = 'Execution services for this niche include weekly topic planning, SEO-ready content production, title/meta optimization, smart internal linking, and KPI-driven performance tracking.';
+            $nicheServicesContent[] = 'Continuous growth services include refreshing older articles, improving search CTR, expanding long-tail keyword coverage, and adapting the content roadmap to market changes.';
+        }
+    }
+    if (empty($nicheServicesContent)) {
+        $nicheServicesContent = $isArabic
+            ? ['نقدّم خدمات مرنة قابلة للتخصيص حسب النيش المستهدف مع متابعة وتحسين مستمر.']
+            : ['We offer flexible, niche-specific services with continuous follow-up and optimization.'];
+    }
     return [
         'about' => [
             'title' => $isArabic ? 'من نحن' : 'About Us',
@@ -2302,6 +2341,36 @@ function getStaticPages($language = null) {
                     'For ad and business inquiries, please email: partnerships@example.com',
                     'We review all messages and aim to reply within 2 business days.',
                 ],
+        ],
+        'services' => [
+            'title' => $isArabic ? 'خدماتنا' : 'Our Services',
+            'description' => $isArabic
+                ? 'نقدم حزمة خدمات سيارات متكاملة تشمل الاستشارات قبل الشراء، تحليل التكلفة، وخطط الصيانة الذكية.'
+                : 'Explore our end-to-end automotive services, from pre-purchase consulting to maintenance planning and ownership optimization.',
+            'content' => array_merge(
+                $isArabic
+                ? [
+                    'نقدّم خدمة استشارات قبل الشراء لمساعدتك على اختيار السيارة المناسبة بناءً على نمط الاستخدام اليومي، ميزانية الوقود أو الشحن، وتكاليف الملكية المتوقعة خلال 3 إلى 5 سنوات.',
+                    'فريقنا يجهّز مقارنة تفصيلية بين الفئات المختلفة لنفس الموديل، مع توضيح الفرق الحقيقي في التجهيزات، أنظمة الأمان، القيمة مقابل السعر، وإعادة البيع المتوقعة في سوق المستعمل.',
+                    'نوفر خدمة مراجعة حالة السيارة المستعملة قبل الشراء عبر قائمة فحص عملية تشمل السجل الفني، حالة الهيكل، أداء المحرك أو البطارية، وتكاليف الإصلاح المحتملة بعد الاستلام.',
+                    'نساعدك في بناء خطة صيانة دورية ذكية مرتبطة بعدد الكيلومترات وطبيعة القيادة داخل المدينة أو على الطرق السريعة، لتقليل الأعطال المفاجئة وتحسين عمر السيارة.',
+                    'نقدم تحليلات تكلفة تشغيل شهرية تتضمن الوقود أو الكهرباء، التأمين، الإهلاك، رسوم الترخيص، وتوقعات الصيانة، بحيث تحصل على صورة مالية واضحة قبل أي قرار.',
+                    'للشركات وأصحاب الأساطيل الصغيرة، نوفر خدمة تحسين إدارة الأسطول عبر تقارير أداء المركبات، توزيع الاستخدام، وتحديد فرص خفض التكلفة ورفع الكفاءة التشغيلية.',
+                    'نوفر خدمة تخطيط الرحلات الطويلة للسيارات الكهربائية والبنزين مع توصيات عملية لنقاط التوقف، إدارة الاستهلاك، وتجهيزات السلامة الضرورية قبل السفر.',
+                    'نشاركك أدلة مبسطة للعناية بالسيارة بعد الشراء، مثل حماية الطلاء، متابعة ضغط الإطارات، تحسين استهلاك الطاقة، والحفاظ على القيمة السوقية للسيارة مع الوقت.',
+                ]
+                : [
+                    'Our pre-purchase advisory service helps you choose the right vehicle using daily driving patterns, fuel or charging realities, and projected 3–5 year ownership costs.',
+                    'We provide detailed trim-level comparisons to highlight meaningful differences in safety features, technology, comfort, resale potential, and true value for money.',
+                    'For used vehicles, we offer a practical inspection framework covering service history, body condition, engine or battery health, and likely near-term repair risks.',
+                    'We design mileage-based maintenance roadmaps tailored to city and highway usage so you can reduce unexpected failures and extend long-term vehicle reliability.',
+                    'Our ownership cost analysis includes fuel or electricity, insurance, depreciation, licensing fees, and forecast maintenance to give you a complete financial view.',
+                    'For small fleets and business operators, we provide optimization guidance through usage analytics, vehicle allocation insights, and cost-efficiency opportunities.',
+                    'We support long-distance trip planning for EV and ICE vehicles with practical stop strategy recommendations, range management tips, and safety preparation checklists.',
+                    'You also get easy-to-follow post-purchase care guidance covering tire pressure habits, paint protection basics, efficiency practices, and resale value preservation.',
+                ],
+                $nicheServicesContent
+            ),
         ],
         'privacy' => [
             'title' => $isArabic ? 'سياسة الخصوصية' : 'Privacy Policy',
