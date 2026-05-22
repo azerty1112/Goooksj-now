@@ -1549,45 +1549,8 @@ $settingsRows = $settingsStmt->fetchAll(PDO::FETCH_ASSOC);
 </head>
 <body class="text-light">
 <!-- تنبيه تفاعلي أعلى الصفحة -->
-<div id="top-alert" class="alert alert-info text-center" role="alert"></div>
+<div id="top-alert" class="alert alert-info text-center" role="alert" style="display:none;"></div>
 <div class="container py-4 py-lg-5">
-    <!-- ترتيب الصفحة: الشريط الجانبي أولاً -->
-    <div class="row">
-        <aside class="col-lg-3">
-            <div class="card section-card dashboard-sidebar">
-                <div class="card-body">
-                    <h5 class="mb-3"><i class="bi bi-layout-sidebar"></i> لوحة الأقسام</h5>
-                    <hr class="border-secondary-subtle my-3">
-                    <input type="search" id="control-panel-search" class="form-control form-control-sm mb-2" placeholder="بحث الأقسام..." aria-label="بحث الأقسام">
-                    <span class="section-counter" id="section-counter">0/0 قسم</span>
-                    <small class="d-block text-secondary mb-2" id="active-section-label">القسم النشط: —</small>
-                    <div class="panel-nav-toolbar">
-                        <button type="button" class="btn btn-sm btn-outline-light" id="panel-prev-btn"><i class="bi bi-arrow-up"></i> السابق</button>
-                        <button type="button" class="btn btn-sm btn-outline-light" id="panel-next-btn">التالي <i class="bi bi-arrow-down"></i></button>
-                    </div>
-                    <div class="d-grid gap-2" id="control-panel-nav"></div>
-                    <div class="panel-nav-empty d-none" id="control-panel-empty">لا يوجد أقسام مطابقة.</div>
-                </div>
-            </div>
-        </aside>
-        <div class="col-lg-9">
-            <!-- الإحصائيات أعلى الصفحة -->
-            <div class="row g-3 mb-4" id="overview-stats">
-                ...existing code...
-            </div>
-            <!-- عرض الرسائل والتنبيهات -->
-            <?php if ($message): ?>
-                <div class="alert alert-<?= e($messageType) ?> shadow-sm position-relative">
-                    <?= e($message) ?>
-                    <button type="button" class="btn-close position-absolute end-0 top-0 mt-2 me-2" onclick="this.parentElement.style.display='none';"></button>
-                </div>
-            <?php endif; ?>
-            <!-- الأقسام الرئيسية -->
-            <div id="active-control-panel">
-                ...existing code...
-            </div>
-        </div>
-    </div>
     <div class="d-flex flex-column flex-lg-row justify-content-between align-items-start align-items-lg-center gap-3 mb-4">
         <div>
             <h1 class="mb-1"><i class="bi bi-speedometer2"></i> <?= e($siteTitle) ?> Control Panel</h1>
@@ -1723,7 +1686,8 @@ $settingsRows = $settingsStmt->fetchAll(PDO::FETCH_ASSOC);
         </aside>
 
         <div class="col-lg-9">
-            <div class="row g-4" id="active-control-panel">
+            <div id="active-control-panel" class="mb-3"></div>
+            <div class="row g-4 d-none" id="control-cards-source">
                 <!-- Section: Daily Publishing Limit -->
                 <div class="card section-card mb-3 panel-section" id="publishing-settings" style="display:none;">
                     <div class="card-body">
@@ -1834,9 +1798,8 @@ $settingsRows = $settingsStmt->fetchAll(PDO::FETCH_ASSOC);
                 </div>
             </div>
 
-            <div class="card section-card mb-3" id="ads-settings">
-                <!-- Section: Ads Manager -->
-                <div class="card section-card mb-3 panel-section" id="ads-settings" style="display:none;">
+            <!-- Section: Ads Manager -->
+            <div class="card section-card mb-3 panel-section" id="ads-settings" style="display:none;">
                     <div class="card-body">
                         <h5><i class="bi bi-badge-ad"></i> Smart Ads Manager</h5>
                         <form method="post" class="row g-2 align-items-end">
@@ -1900,74 +1863,27 @@ $settingsRows = $settingsStmt->fetchAll(PDO::FETCH_ASSOC);
                     </div>
                 </div>
 
-                <!-- Add more sections here as needed, following the same pattern -->
-            </div>
-            <script>
-                // Section navigation logic
-                const sectionIds = [
-                    'publishing-settings',
-                    'seo-settings',
-                    'ads-settings',
-                    // Add more section IDs here
-                ];
-                let activeSection = sectionIds[0];
-                function showSection(id) {
-                    sectionIds.forEach(sid => {
-                        document.getElementById(sid).style.display = sid === id ? '' : 'none';
-                    });
-                    activeSection = id;
-                    document.getElementById('active-section-label').textContent = 'Active: ' + document.getElementById(id).querySelector('h5').textContent;
-                }
-                // Build navigation
-                const nav = document.getElementById('control-panel-nav');
-                nav.innerHTML = '';
-                sectionIds.forEach((sid, idx) => {
-                    const btn = document.createElement('button');
-                    btn.type = 'button';
-                    btn.className = 'btn panel-nav-btn' + (idx === 0 ? ' active' : '');
-                    btn.textContent = document.getElementById(sid).querySelector('h5').textContent;
-                    btn.onclick = () => {
-                        showSection(sid);
-                        Array.from(nav.children).forEach(b => b.classList.remove('active'));
-                        btn.classList.add('active');
-                    };
-                    nav.appendChild(btn);
-                });
-                // Show first section by default
-                showSection(sectionIds[0]);
-                // Section counter
-                document.getElementById('section-counter').textContent = `${sectionIds.indexOf(activeSection)+1}/${sectionIds.length} sections`;
-                // Prev/Next buttons
-                document.getElementById('panel-prev-btn').onclick = () => {
-                    let idx = sectionIds.indexOf(activeSection);
-                    if (idx > 0) showSection(sectionIds[idx-1]);
-                    Array.from(nav.children).forEach((b, i) => b.classList.toggle('active', i === idx-1));
-                    document.getElementById('section-counter').textContent = `${sectionIds.indexOf(activeSection)+1}/${sectionIds.length} sections`;
-                };
-                document.getElementById('panel-next-btn').onclick = () => {
-                    let idx = sectionIds.indexOf(activeSection);
-                    if (idx < sectionIds.length-1) showSection(sectionIds[idx+1]);
-                    Array.from(nav.children).forEach((b, i) => b.classList.toggle('active', i === idx+1));
-                    document.getElementById('section-counter').textContent = `${sectionIds.indexOf(activeSection)+1}/${sectionIds.length} sections`;
-                };
-            </script>
-+            
-+            <!-- ads.txt editor card -->
-+            <div class="card section-card mb-3" id="ads-txt-editor">
-+                <div class="card-body">
-+                    <h5><i class="bi bi-file-text"></i> ads.txt</h5>
-+                    <form method="post">
-+                        <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
-+                        <div class="mb-2">
-+                            <textarea name="ads_txt_content" class="form-control" rows="6" placeholder="Enter ads.txt content"><?= e($adsTxtContent) ?></textarea>
-+                        </div>
-+                        <button name="save_ads_txt" value="1" class="btn btn-outline-light btn-sm">Save ads.txt</button>
-+                    </form>
-+                    <small class="text-secondary">Modify the advertising file served at <code>/ads.txt</code>.</small>
-+                </div>
-+            </div>
-*** End Patch
-            <!-- moved scripts inputs into SEO card above -->
+            <div class="card section-card mb-3 panel-section" id="scripts-settings" style="display:none;">
+                <div class="card-body">
+                    <h5><i class="bi bi-code-slash"></i> Scripts & Tracking</h5>
+                    <form method="post" class="row g-2 align-items-end">
+                        <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
+                        <div class="col-6">
+                            <label class="form-label">Google Analytics ID</label>
+                            <input type="text" name="google_analytics_id" class="form-control" value="<?= e($googleAnalyticsId) ?>" placeholder="G-XXXXXXXXXX">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Google Tag Manager ID</label>
+                            <input type="text" name="google_tag_manager_id" class="form-control" value="<?= e($googleTagManagerId) ?>" placeholder="GTM-XXXXXXX">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Google Verification</label>
+                            <input type="text" name="google_site_verification" class="form-control" maxlength="255" value="<?= e($googleSiteVerification) ?>">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Bing Verification</label>
+                            <input type="text" name="bing_site_verification" class="form-control" maxlength="255" value="<?= e($bingSiteVerification) ?>">
+                        </div>
                         <div class="col-12">
                             <label class="form-label">Meta Pixel ID</label>
                             <input type="text" name="meta_pixel_id" class="form-control" maxlength="30" value="<?= e($metaPixelId) ?>" placeholder="123456789012345">
@@ -1981,7 +1897,12 @@ $settingsRows = $settingsStmt->fetchAll(PDO::FETCH_ASSOC);
                             <textarea name="custom_body_scripts" class="form-control" rows="4" placeholder="&lt;script&gt;...&lt;/script&gt;"><?= e($customBodyScripts) ?></textarea>
                         </div>
                         <div class="col-12">
-                            <button name="update_scripts_settings" value="1" class="btn btn-outline-light w-100">Save Scripts Settings</button>
+                            <label class="form-label">ads.txt</label>
+                            <textarea name="ads_txt_content" class="form-control" rows="5" placeholder="google.com, pub-xxxxxxxxxxxxxxxx, DIRECT, f08c47fec0942fa0"><?= e($adsTxtContent) ?></textarea>
+                            <small class="text-secondary">This content is saved in settings and written to <code>/ads.txt</code>.</small>
+                        </div>
+                        <div class="col-12">
+                            <button name="update_scripts_settings" value="1" class="btn btn-outline-light w-100">Save Scripts & Tracking</button>
                         </div>
                     </form>
                     <small class="text-secondary">Use this section to inject tracking scripts globally across the site.</small>
@@ -2490,7 +2411,6 @@ $settingsRows = $settingsStmt->fetchAll(PDO::FETCH_ASSOC);
                 <a href="admin.php?export=articles_csv" class="btn btn-outline-light w-100"><i class="bi bi-filetype-csv"></i> Export CSV</a>
             </div>
 
-            <div id="active-control-panel"></div>
 
             <ul class="nav nav-pills admin-tabs gap-2 mb-3" id="adminDataTabs" role="tablist">
                 <li class="nav-item" role="presentation">
@@ -2806,8 +2726,9 @@ $settingsRows = $settingsStmt->fetchAll(PDO::FETCH_ASSOC);
         var val = el ? (el.innerText || el.textContent) : '';
         if (!val) return;
         navigator.clipboard.writeText(val).then(function() {
-            var successId = 'copy-success-' + elementId.replace(/[^a-zA-Z0-9]/g, '');
-            var successEl = document.getElementById(successId);
+            var normalizedSuccessId = 'copy-success-' + elementId.replace(/[^a-zA-Z0-9]/g, '');
+            var exactSuccessId = 'copy-success-' + elementId;
+            var successEl = document.getElementById(exactSuccessId) || document.getElementById(normalizedSuccessId);
             if (successEl) {
                 successEl.style.display = 'inline';
                 setTimeout(function(){ successEl.style.display = 'none'; }, 1200);
@@ -2834,7 +2755,6 @@ $settingsRows = $settingsStmt->fetchAll(PDO::FETCH_ASSOC);
         const sectionCounter = document.getElementById('section-counter');
         let currentIndex = 0;
 
-             <!-- Removed from here - now inside Auto Title Generator Controls -->
         function getVisibleButtons() {
             return Array.from(panelNav.querySelectorAll('button')).filter(function (btn) {
                 return !btn.classList.contains('d-none');
