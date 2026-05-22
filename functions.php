@@ -1061,7 +1061,7 @@ function getAdSettings() {
         'mode' => $mode,
         'paragraph_interval' => getSettingInt('ads_paragraph_interval', 4, 2, 10),
         'max_units' => getSettingInt('ads_max_units_per_article', 2, 1, 6),
-        'min_words_before_first' => getSettingInt('ads_min_words_before_first_injection', 180, 80, 600),
+        'min_words_before_first' => getSettingInt('ads_min_words_before_first_injection', 260, 120, 900),
         'min_article_words' => getSettingInt('ads_min_article_words', 420, 120, 3000),
         'blocked_title_keywords' => trim((string)getSetting('ads_blocked_title_keywords', '')),
         'blocked_categories' => trim((string)getSetting('ads_blocked_categories', '')),

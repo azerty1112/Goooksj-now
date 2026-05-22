@@ -18,9 +18,8 @@ $baseUrl = getSiteBaseUrl();
 $siteTitle = getSiteTitle();
 $pageTitle = (string)getSetting('seo_home_title', $siteTitle);
 $pageDescription = (string)getSetting('seo_home_description', 'Automotive reviews, guides, and practical car ownership tips.');
-$canonicalUrl = $baseUrl . '/index.php';
-// always include language in canonical links
-$canonicalUrl .= (strpos($canonicalUrl, '?') === false ? '?' : '&') . 'lang=' . urlencode($language);
+$canonicalBaseUrl = $baseUrl . '/index.php';
+$canonicalUrl = $canonicalBaseUrl . (strpos($canonicalBaseUrl, '?') === false ? '?' : '&') . 'lang=' . urlencode($language);
 $openGraphType = 'website';
 $openGraphImage = null;
 $articleStructuredData = null;
@@ -115,7 +114,8 @@ if ($isFilteredListing) {
 if ($staticPage !== '') {
     $pageTitle = $staticPages[$staticPage]['title'] . ' | ' . $siteTitle;
     $pageDescription = $staticPages[$staticPage]['description'];
-    $canonicalUrl = $baseUrl . '/index.php?doc=' . rawurlencode($staticPage) . '&lang=' . urlencode($language);
+    $canonicalBaseUrl = $baseUrl . '/index.php?doc=' . rawurlencode($staticPage);
+    $canonicalUrl = $canonicalBaseUrl . '&lang=' . urlencode($language);
     $openGraphType = 'website';
     if ($defaultSocialImage !== '') {
         $openGraphImage = $defaultSocialImage;
@@ -136,7 +136,8 @@ if ($slug !== '') {
             $pageDescription = mb_substr(trim(strip_tags((string)($seoArticle['content'] ?? ''))), 0, 160);
         }
         $pageDescription = mb_substr($pageDescription, 0, 160);
-        $canonicalUrl = $baseUrl . '/index.php?slug=' . rawurlencode((string)$seoArticle['slug']) . '&lang=' . urlencode($language);
+        $canonicalBaseUrl = $baseUrl . '/index.php?slug=' . rawurlencode((string)$seoArticle['slug']);
+        $canonicalUrl = $canonicalBaseUrl . '&lang=' . urlencode($language);
         $openGraphType = 'article';
 
         $openGraphImages = [];
@@ -266,9 +267,9 @@ if ($slug === '' && $staticPage === '') {
         <meta name="msvalidate.01" content="<?= e($bingSiteVerification) ?>">
     <?php endif; ?>
     <link rel="canonical" href="<?= e($canonicalUrl) ?>">
-    <link rel="alternate" hreflang="en" href="<?= e($canonicalUrl . (str_contains($canonicalUrl, '?') ? '&' : '?') . 'lang=en') ?>">
-    <link rel="alternate" hreflang="ar" href="<?= e($canonicalUrl . (str_contains($canonicalUrl, '?') ? '&' : '?') . 'lang=ar') ?>">
-    <link rel="alternate" hreflang="x-default" href="<?= e($canonicalUrl . (str_contains($canonicalUrl, '?') ? '&' : '?') . 'lang=en') ?>">
+    <link rel="alternate" hreflang="en" href="<?= e($canonicalBaseUrl . (str_contains($canonicalBaseUrl, '?') ? '&' : '?') . 'lang=en') ?>">
+    <link rel="alternate" hreflang="ar" href="<?= e($canonicalBaseUrl . (str_contains($canonicalBaseUrl, '?') ? '&' : '?') . 'lang=ar') ?>">
+    <link rel="alternate" hreflang="x-default" href="<?= e($canonicalBaseUrl . (str_contains($canonicalBaseUrl, '?') ? '&' : '?') . 'lang=en') ?>">
     <meta property="og:title" content="<?= e($pageTitle) ?>">
     <meta property="og:description" content="<?= e($pageDescription) ?>">
     <meta property="og:type" content="<?= e($openGraphType) ?>">
