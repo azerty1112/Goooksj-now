@@ -1951,22 +1951,21 @@ $settingsRows = $settingsStmt->fetchAll(PDO::FETCH_ASSOC);
                     document.getElementById('section-counter').textContent = `${sectionIds.indexOf(activeSection)+1}/${sectionIds.length} sections`;
                 };
             </script>
-+            
-+            <!-- ads.txt editor card -->
-+            <div class="card section-card mb-3" id="ads-txt-editor">
-+                <div class="card-body">
-+                    <h5><i class="bi bi-file-text"></i> ads.txt</h5>
-+                    <form method="post">
-+                        <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
-+                        <div class="mb-2">
-+                            <textarea name="ads_txt_content" class="form-control" rows="6" placeholder="Enter ads.txt content"><?= e($adsTxtContent) ?></textarea>
-+                        </div>
-+                        <button name="save_ads_txt" value="1" class="btn btn-outline-light btn-sm">Save ads.txt</button>
-+                    </form>
-+                    <small class="text-secondary">Modify the advertising file served at <code>/ads.txt</code>.</small>
-+                </div>
-+            </div>
-*** End Patch
+            
+            <!-- ads.txt editor card -->
+            <div class="card section-card mb-3" id="ads-txt-editor">
+                <div class="card-body">
+                    <h5><i class="bi bi-file-text"></i> ads.txt</h5>
+                    <form method="post">
+                        <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
+                        <div class="mb-2">
+                            <textarea name="ads_txt_content" class="form-control" rows="6" placeholder="Enter ads.txt content"><?= e($adsTxtContent) ?></textarea>
+                        </div>
+                        <button name="update_scripts_settings" value="1" class="btn btn-outline-light btn-sm">Save ads.txt</button>
+                    </form>
+                    <small class="text-secondary">Modify the advertising file served at <code>/ads.txt</code>.</small>
+                </div>
+            </div>
             <!-- moved scripts inputs into SEO card above -->
                         <div class="col-12">
                             <label class="form-label">Meta Pixel ID</label>
