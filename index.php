@@ -61,6 +61,9 @@ $bingSiteVerification = trim((string)getSetting('bing_site_verification', ''));
 $metaPixelId = trim((string)getSetting('meta_pixel_id', ''));
 $customHeadScripts = trim((string)getSetting('custom_head_scripts', ''));
 $customBodyScripts = trim((string)getSetting('custom_body_scripts', ''));
+$adsSettings = getAdSettings();
+$shouldRenderGlobalAd = !empty($adsSettings['enabled']);
+$globalAdUnitHtml = $shouldRenderGlobalAd ? buildInlineAdUnitHtml($adsSettings, 0) : '';
 
 function renderCustomScripts($scripts) {
     $scripts = trim((string)$scripts);
@@ -860,6 +863,9 @@ if ($slug === '' && $staticPage === '') {
     </style>
 </head>
 <body>
+<?php if ($googleTagManagerId !== ''): ?>
+    <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=<?= e($googleTagManagerId) ?>" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+<?php endif; ?>
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
     <div class="container flex-wrap gap-2 py-2">
         <a class="navbar-brand" href="index.php"><?= e($siteTitle) ?></a>
@@ -986,6 +992,11 @@ $baseQuery['per_page'] = $perPage;
     <?php if ($art): ?>
         <?php $articleContentWithAds = injectAdsIntoArticleContent((string)($art['content'] ?? ''), (string)($art['title'] ?? ''), (string)($art['category'] ?? ''));
         $articleContentWithAds = injectSeoAutoLinks($articleContentWithAds, (int)($art['id'] ?? 0)); ?>
+        <?php if ($shouldRenderGlobalAd): ?>
+            <section class="mb-4" aria-label="Top sponsored placement">
+                <?= $globalAdUnitHtml ?>
+            </section>
+        <?php endif; ?>
         <a href="index.php<?= $baseQuery ? '?' . http_build_query($baseQuery) : '' ?>" class="btn btn-sm btn-outline-secondary mb-3">&larr; Back to articles</a>
         <article class="article-content bg-white p-4 rounded shadow-sm">
             <header class="article-header-panel">
@@ -1071,6 +1082,11 @@ $baseQuery['per_page'] = $perPage;
                     });
                 </script>
             </section>
+            <?php if ($shouldRenderGlobalAd): ?>
+                <section class="mt-4" aria-label="In-article sponsored placement">
+                    <?= $globalAdUnitHtml ?>
+                </section>
+            <?php endif; ?>
         </article>
 
         <?php
@@ -1268,6 +1284,11 @@ $baseQuery['per_page'] = $perPage;
         <div class="col-4 col-md-4"><div class="stats-card p-3"><small class="text-muted d-block">Filtered results</small><strong class="fs-4"><?= $total ?></strong></div></div>
         <div class="col-4 col-md-4"><div class="stats-card p-3"><small class="text-muted d-block">Avg read time (page)</small><strong class="fs-4"><?= $avgReading ?> min</strong></div></div>
     </div>
+    <?php if ($shouldRenderGlobalAd): ?>
+        <section class="mb-4" aria-label="Listing sponsored placement">
+            <?= $globalAdUnitHtml ?>
+        </section>
+    <?php endif; ?>
 
     <?php if ($featured): ?>
         <?php $featuredQuery = array_merge($baseQuery, ['slug' => $featured['slug']]); ?>
@@ -1317,7 +1338,7 @@ $baseQuery['per_page'] = $perPage;
                             <div class="card h-100 shadow-sm">
                                 <img src="<?= e($cardImage) ?>" class="card-img-top" style="height:200px;object-fit:cover" alt="<?= e(buildImageSeoText($displayTitle, $row['slug'] ?? '', $imageAltSuffix)) ?>" title="<?= e(buildImageSeoText($displayTitle, $row['slug'] ?? '', $imageTitleSuffix)) ?>" loading="<?= $index === 0 ? 'eager' : 'lazy' ?>" fetchpriority="<?= $index === 0 ? 'high' : 'low' ?>" decoding="async">
                                 <div class="card-body d-flex flex-column">
-                                    <h3 class="card-title h5 mb-0\><?= e($displayTitle) ?></h3>
+                                    <h3 class="card-title h5 mb-0"><?= e($displayTitle) ?></h3>
                             <p class="card-text text-muted"><?= e($row['excerpt']) ?></p>
                             <div class="d-flex flex-wrap gap-2 mb-3">
                                 <span class="meta-pill">📅 <?= e($row['published_at']) ?></span>
@@ -1438,9 +1459,6 @@ $baseQuery['per_page'] = $perPage;
             }
         })();
     </script>
-<?php endif; ?>
-<?php if ($googleTagManagerId !== ''): ?>
-    <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=<?= e($googleTagManagerId) ?>" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
 <?php endif; ?>
 <?php if ($customBodyScripts !== ''): ?>
     <?= renderCustomScripts($customBodyScripts) ?>

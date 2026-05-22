@@ -2057,7 +2057,7 @@ $settingsRows = $settingsStmt->fetchAll(PDO::FETCH_ASSOC);
                     <small class="text-secondary">Use this section to inject tracking scripts globally across the site.</small>
                     <div class="alert alert-secondary mt-3 mb-0">
                         <div><strong>Sitemap URL:</strong> <code id="sitemap-url"><?= e($sitemapUrl) ?></code>
-                            <button class="copy-btn" onclick="copyToClipboard('sitemap-url')" title="نسخ"><i class="bi bi-clipboard"></i></button>
+                            <button type="button" class="copy-btn" onclick="copyToClipboard('sitemap-url')" title="نسخ"><i class="bi bi-clipboard"></i></button>
                             <span id="copy-success-sitemap" class="copy-success" style="display:none;">تم النسخ!</span>
                         </div>
                         <div class="small mt-2">Submit this URL in Google Search Console and Bing Webmaster Tools for faster indexing.</div>
@@ -2572,19 +2572,19 @@ $settingsRows = $settingsStmt->fetchAll(PDO::FETCH_ASSOC);
                     <h5><i class="bi bi-gear-wide-connected"></i> System Constants (Read Only)</h5>
                     <div class="small">
                         <div><span class="text-secondary">SITE_TITLE (fallback constant):</span> <code id="site-title-const"><?= e(SITE_TITLE) ?></code>
-                            <button class="copy-btn" onclick="copyToClipboard('site-title-const')" title="نسخ"><i class="bi bi-clipboard"></i></button>
+                            <button type="button" class="copy-btn" onclick="copyToClipboard('site-title-const')" title="نسخ"><i class="bi bi-clipboard"></i></button>
                             <span id="copy-success-title" class="copy-success" style="display:none;">تم النسخ!</span>
                         </div>
                         <div><span class="text-secondary">Configured Site Title:</span> <code id="site-title-config"><?= e($siteTitle) ?></code>
-                            <button class="copy-btn" onclick="copyToClipboard('site-title-config')" title="نسخ"><i class="bi bi-clipboard"></i></button>
+                            <button type="button" class="copy-btn" onclick="copyToClipboard('site-title-config')" title="نسخ"><i class="bi bi-clipboard"></i></button>
                             <span id="copy-success-config" class="copy-success" style="display:none;">تم النسخ!</span>
                         </div>
                         <div><span class="text-secondary">DB_FILE:</span> <code id="db-file"><?= e(DB_FILE) ?></code>
-                            <button class="copy-btn" onclick="copyToClipboard('db-file')" title="نسخ"><i class="bi bi-clipboard"></i></button>
+                            <button type="button" class="copy-btn" onclick="copyToClipboard('db-file')" title="نسخ"><i class="bi bi-clipboard"></i></button>
                             <span id="copy-success-db" class="copy-success" style="display:none;">تم النسخ!</span>
                         </div>
                         <div><span class="text-secondary">Password Hash:</span> <code id="pass-hash"><?= e(substr(PASSWORD_HASH, 0, 20)) ?>...</code>
-                            <button class="copy-btn" onclick="copyToClipboard('pass-hash')" title="نسخ"><i class="bi bi-clipboard"></i></button>
+                            <button type="button" class="copy-btn" onclick="copyToClipboard('pass-hash')" title="نسخ"><i class="bi bi-clipboard"></i></button>
                             <span id="copy-success-hash" class="copy-success" style="display:none;">تم النسخ!</span>
                         </div>
                     </div>
@@ -2716,7 +2716,7 @@ $settingsRows = $settingsStmt->fetchAll(PDO::FETCH_ASSOC);
                                                 <td>
                                                     <div class="fw-semibold"><?= e($row['title']) ?>
                                                         <!-- زر نسخ عنوان المقال -->
-                                                        <button class="copy-btn" onclick="copyToClipboard('article-title-<?= (int)$row['id'] ?>')" title="نسخ"><i class="bi bi-clipboard"></i></button>
+                                                        <button type="button" class="copy-btn" onclick="copyToClipboard('article-title-<?= (int)$row['id'] ?>')" title="نسخ"><i class="bi bi-clipboard"></i></button>
                                                         <span id="copy-success-article-title-<?= (int)$row['id'] ?>" class="copy-success" style="display:none;">تم النسخ!</span>
                                                     </div>
                                                     <small class="text-secondary" id="article-title-<?= (int)$row['id'] ?>">/<?= e($row['slug']) ?></small>
@@ -2807,7 +2807,7 @@ $settingsRows = $settingsStmt->fetchAll(PDO::FETCH_ASSOC);
                                         <li class="list-group-item d-flex justify-content-between align-items-center">
                                             <span class="text-break pe-2" id="rss-url-<?= (int)$rss['id'] ?>"><?= e($rss['url']) ?></span>
                                             <!-- زر نسخ رابط المصدر -->
-                                            <button class="copy-btn" onclick="copyToClipboard('rss-url-<?= (int)$rss['id'] ?>')" title="نسخ"><i class="bi bi-clipboard"></i></button>
+                                            <button type="button" class="copy-btn" onclick="copyToClipboard('rss-url-<?= (int)$rss['id'] ?>')" title="نسخ"><i class="bi bi-clipboard"></i></button>
                                             <span id="copy-success-rss-url-<?= (int)$rss['id'] ?>" class="copy-success" style="display:none;">تم النسخ!</span>
                                             <div class="d-flex gap-2">
                                                 <button class="btn btn-sm btn-outline-warning" data-bs-toggle="collapse" data-bs-target="#edit-rss-<?= (int)$rss['id'] ?>" aria-expanded="false">Edit</button>
@@ -2855,7 +2855,7 @@ $settingsRows = $settingsStmt->fetchAll(PDO::FETCH_ASSOC);
                                         <li class="list-group-item d-flex justify-content-between align-items-center">
                                             <span class="text-break pe-2" id="web-url-<?= (int)$web['id'] ?>"><?= e($web['url']) ?></span>
                                             <!-- زر نسخ رابط المصدر -->
-                                            <button class="copy-btn" onclick="copyToClipboard('web-url-<?= (int)$web['id'] ?>')" title="نسخ"><i class="bi bi-clipboard"></i></button>
+                                            <button type="button" class="copy-btn" onclick="copyToClipboard('web-url-<?= (int)$web['id'] ?>')" title="نسخ"><i class="bi bi-clipboard"></i></button>
                                             <span id="copy-success-web-url-<?= (int)$web['id'] ?>" class="copy-success" style="display:none;">تم النسخ!</span>
                                             <div class="d-flex gap-2">
                                                 <button class="btn btn-sm btn-outline-warning" data-bs-toggle="collapse" data-bs-target="#edit-web-<?= (int)$web['id'] ?>" aria-expanded="false">Edit</button>
@@ -2913,21 +2913,22 @@ $settingsRows = $settingsStmt->fetchAll(PDO::FETCH_ASSOC);
                                     <li class="list-group-item text-center text-secondary">No settings found.</li>
                                 <?php else: ?>
                                     <?php foreach ($settingsRows as $setting): ?>
+                                        <?php $settingDomId = preg_replace('/[^a-zA-Z0-9_-]/', '-', (string)$setting['key']); ?>
                                         <li class="list-group-item">
                                             <form method="post" class="row g-2 align-items-center">
                                                 <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
                                                 <input type="hidden" name="original_setting_key" value="<?= e($setting['key']) ?>">
                                                 <div class="col-md-4">
-                                                    <input type="text" name="setting_key" class="form-control form-control-sm" value="<?= e($setting['key']) ?>" required id="setting-key-<?= htmlspecialchars($setting['key']) ?>">
+                                                    <input type="text" name="setting_key" class="form-control form-control-sm" value="<?= e($setting['key']) ?>" required id="setting-key-<?= e($settingDomId) ?>">
                                                     <!-- زر نسخ مفتاح الإعداد -->
-                                                    <button class="copy-btn" onclick="copyToClipboard('setting-key-<?= htmlspecialchars($setting['key']) ?>')" title="نسخ"><i class="bi bi-clipboard"></i></button>
-                                                    <span id="copy-success-setting-key-<?= htmlspecialchars($setting['key']) ?>" class="copy-success" style="display:none;">تم النسخ!</span>
+                                                    <button type="button" class="copy-btn" onclick="copyToClipboard('setting-key-<?= e($settingDomId) ?>')" title="نسخ"><i class="bi bi-clipboard"></i></button>
+                                                    <span id="copy-success-setting-key-<?= e($settingDomId) ?>" class="copy-success" style="display:none;">تم النسخ!</span>
                                                 </div>
                                                 <div class="col-md-6">
-                                                    <input type="text" name="setting_value" class="form-control form-control-sm" value="<?= e($setting['value']) ?>" id="setting-value-<?= htmlspecialchars($setting['key']) ?>">
+                                                    <input type="text" name="setting_value" class="form-control form-control-sm" value="<?= e($setting['value']) ?>" id="setting-value-<?= e($settingDomId) ?>">
                                                     <!-- زر نسخ قيمة الإعداد -->
-                                                    <button class="copy-btn" onclick="copyToClipboard('setting-value-<?= htmlspecialchars($setting['key']) ?>')" title="نسخ"><i class="bi bi-clipboard"></i></button>
-                                                    <span id="copy-success-setting-value-<?= htmlspecialchars($setting['key']) ?>" class="copy-success" style="display:none;">تم النسخ!</span>
+                                                    <button type="button" class="copy-btn" onclick="copyToClipboard('setting-value-<?= e($settingDomId) ?>')" title="نسخ"><i class="bi bi-clipboard"></i></button>
+                                                    <span id="copy-success-setting-value-<?= e($settingDomId) ?>" class="copy-success" style="display:none;">تم النسخ!</span>
                                                 </div>
                                                 <div class="col-md-2 d-flex gap-2">
                                                     <button name="save_setting" value="1" class="btn btn-sm btn-outline-success flex-fill">Update</button>
@@ -2951,27 +2952,71 @@ $settingsRows = $settingsStmt->fetchAll(PDO::FETCH_ASSOC);
 </div>
 <script>
     // دالة نسخ للقيم المهمة
+    function showTopAlert(message, type) {
+        var topAlert = document.getElementById('top-alert');
+        if (!topAlert) return;
+        topAlert.textContent = message;
+        topAlert.className = 'alert alert-' + (type || 'info') + ' text-center';
+        topAlert.style.display = 'block';
+        setTimeout(function(){ topAlert.style.display = 'none'; }, 1800);
+    }
+
+    function revealCopySuccess(elementId) {
+        var normalizedSuccessId = 'copy-success-' + elementId.replace(/[^a-zA-Z0-9]/g, '');
+        var exactSuccessId = 'copy-success-' + elementId;
+        var successEl = document.getElementById(exactSuccessId) || document.getElementById(normalizedSuccessId);
+        if (successEl) {
+            successEl.style.display = 'inline';
+            setTimeout(function(){ successEl.style.display = 'none'; }, 1200);
+        }
+    }
+
+    function legacyCopyText(text) {
+        var temp = document.createElement('textarea');
+        temp.value = text;
+        temp.setAttribute('readonly', '');
+        temp.style.position = 'absolute';
+        temp.style.left = '-9999px';
+        document.body.appendChild(temp);
+        temp.select();
+        temp.setSelectionRange(0, 99999);
+        var ok = false;
+        try {
+            ok = document.execCommand('copy');
+        } catch (e) {
+            ok = false;
+        }
+        document.body.removeChild(temp);
+        return ok;
+    }
+
     function copyToClipboard(elementId) {
         var el = document.getElementById(elementId);
         var val = el ? (el.innerText || el.textContent) : '';
         if (!val) return;
-        navigator.clipboard.writeText(val).then(function() {
-            var normalizedSuccessId = 'copy-success-' + elementId.replace(/[^a-zA-Z0-9]/g, '');
-            var exactSuccessId = 'copy-success-' + elementId;
-            var successEl = document.getElementById(exactSuccessId) || document.getElementById(normalizedSuccessId);
-            if (successEl) {
-                successEl.style.display = 'inline';
-                setTimeout(function(){ successEl.style.display = 'none'; }, 1200);
-            }
-            // تنبيه أعلى الصفحة
-            var topAlert = document.getElementById('top-alert');
-            if(topAlert) {
-                topAlert.textContent = 'تم نسخ القيمة بنجاح!';
-                topAlert.className = 'alert alert-success text-center';
-                topAlert.style.display = 'block';
-                setTimeout(function(){ topAlert.style.display = 'none'; }, 1500);
-            }
-        });
+        if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+            navigator.clipboard.writeText(val).then(function() {
+                revealCopySuccess(elementId);
+                showTopAlert('تم نسخ القيمة بنجاح!', 'success');
+            }).catch(function() {
+                var fallbackOk = legacyCopyText(val);
+                if (fallbackOk) {
+                    revealCopySuccess(elementId);
+                    showTopAlert('تم النسخ عبر الطريقة البديلة.', 'success');
+                } else {
+                    showTopAlert('تعذر النسخ تلقائيًا. انسخ يدويًا.', 'warning');
+                }
+            });
+            return;
+        }
+
+        var ok = legacyCopyText(val);
+        if (ok) {
+            revealCopySuccess(elementId);
+            showTopAlert('تم النسخ عبر الطريقة البديلة.', 'success');
+        } else {
+            showTopAlert('تعذر النسخ تلقائيًا. انسخ يدويًا.', 'warning');
+        }
     }
     document.addEventListener('DOMContentLoaded', function () {
         const sourceCards = Array.from(document.querySelectorAll('#control-cards-source .section-card'));
@@ -2994,10 +3039,9 @@ $settingsRows = $settingsStmt->fetchAll(PDO::FETCH_ASSOC);
         function updateCounter() {
             if (!sectionCounter || !panelNav) return;
             const visibleButtons = getVisibleButtons();
-            const total = sourceCards.length;
 
             if (!visibleButtons.length) {
-                sectionCounter.textContent = '0/' + total + ' sections';
+                sectionCounter.textContent = '0/0 sections';
                 return;
             }
 
