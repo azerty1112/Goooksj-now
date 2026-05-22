@@ -472,6 +472,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
+    if (isset($_POST['update_smart_niche_automation'])) {
+        $nicheSlug = trim((string)($_POST['smart_active_niche'] ?? ''));
+        if ($nicheSlug !== '') {
+            setSetting('active_niche', $nicheSlug);
+        }
+
+        $enabled = isset($_POST['smart_auto_ai_enabled']) ? 1 : 0;
+        $intervalFrom = (int)($_POST['smart_auto_publish_interval_seconds_from'] ?? 1);
+        $intervalTo = (int)($_POST['smart_auto_publish_interval_seconds_to'] ?? 10800);
+        $intervalFrom = max(0, min(300000, $intervalFrom));
+        $intervalTo = max(0, min(300000, $intervalTo));
+        if ($intervalTo < $intervalFrom) {
+            [$intervalFrom, $intervalTo] = [$intervalTo, $intervalFrom];
+        }
+        $interval = max(1, $intervalTo);
+
+        $mode = trim((string)($_POST['smart_auto_title_mode'] ?? 'template'));
+        if (!in_array($mode, ['template', 'list'], true)) {
+            $mode = 'template';
+        }
+
+        setSetting('auto_ai_enabled', (string)$enabled);
+        setSetting('auto_publish_interval_seconds_from', (string)$intervalFrom);
+        setSetting('auto_publish_interval_seconds_to', (string)$intervalTo);
+        setSetting('auto_publish_interval_seconds', (string)$interval);
+        setSetting('auto_title_mode', $mode);
+
+        $_SESSION['flash_message'] = 'Smart automation hub updated (niche + scheduler + title mode).';
+        $_SESSION['flash_type'] = 'success';
+        header('Location: admin.php#auto-scheduler-section');
+        exit;
+    }
+
     if (isset($_POST['update_auto_title_settings'])) {
         $mode = trim((string)($_POST['auto_title_mode'] ?? 'template'));
         if (!in_array($mode, ['template', 'list'], true)) {
@@ -2248,7 +2281,56 @@ $settingsRows = $settingsStmt->fetchAll(PDO::FETCH_ASSOC);
 
             <div class="card section-card mb-3" id="auto-scheduler-section">
                 <div class="card-body">
-                    <h5 class="text-danger"><i class="bi bi-robot"></i> AI Auto Publish Scheduler</h5>
+                    <h5 class="text-danger"><i class="bi bi-robot"></i> Smart Niche Automation Hub</h5>
+                    <p class="text-secondary mb-3">دمج ذكي بين <strong>AI Auto Publish Scheduler</strong> و <strong>Niche Management</strong> و <strong>Auto Title Generator Controls</strong> في لوحة واحدة لإدارة أسرع.</p>
+                    <form method="post" class="row g-2 align-items-end mb-3">
+                        <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
+                        <div class="col-md-4">
+                            <label class="form-label">Active Niche</label>
+                            <select name="smart_active_niche" class="form-select">
+                                <?php foreach ($nichesList as $n): ?>
+                                    <option value="<?= e($n['slug']) ?>" <?= e((string)getSetting('active_niche', 'general')) === $n['slug'] ? 'selected' : '' ?>><?= e($n['name']) ?> (<?= e($n['slug']) ?>)</option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Auto Title Mode</label>
+                            <select name="smart_auto_title_mode" class="form-select">
+                                <option value="template" <?= $autoTitleMode === 'template' ? 'selected' : '' ?>>Template + Variables</option>
+                                <option value="list" <?= $autoTitleMode === 'list' ? 'selected' : '' ?>>Fixed Titles List</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Interval From</label>
+                            <input type="number" name="smart_auto_publish_interval_seconds_from" class="form-control" min="0" max="300000" value="<?= (int)$autoPublishIntervalFrom ?>">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Interval To</label>
+                            <input type="number" name="smart_auto_publish_interval_seconds_to" class="form-control" min="0" max="300000" value="<?= (int)$autoPublishIntervalTo ?>">
+                        </div>
+                        <div class="col-md-1">
+                            <div class="form-check form-switch mt-4">
+                                <input class="form-check-input" type="checkbox" role="switch" id="smart_auto_ai_enabled" name="smart_auto_ai_enabled" value="1" <?= $autoAiEnabled ? 'checked' : '' ?>>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <button name="update_smart_niche_automation" value="1" class="btn btn-warning w-100">Apply Smart Merge Settings</button>
+                        </div>
+                    </form>
+
+                    <div class="alert alert-info">
+                        <strong>أمثلة نيشات مقترحة:</strong>
+                        <ul class="mb-0 mt-2">
+                            <li><strong>EV</strong>: Tesla, BYD, Lucid + محتوى الشحن السريع والمدى.</li>
+                            <li><strong>SUV Family</strong>: أمان العائلة، المساحة، أفضل 7 مقاعد.</li>
+                            <li><strong>Luxury</strong>: Mercedes, BMW, Audi + مراجعات الفخامة والتقنيات.</li>
+                            <li><strong>Motorcycles</strong>: Adventure/Street bikes + معدات القيادة.</li>
+                            <li><strong>Budget Cars</strong>: أفضل سيارات اقتصادية واستهلاك الوقود.</li>
+                        </ul>
+                    </div>
+
+                    <hr class="border-secondary-subtle my-3">
+                    <h6><i class="bi bi-sliders"></i> Advanced Scheduler + Title Controls</h6>
                     <form method="post" class="row g-2 align-items-end mb-3">
                         <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
                         <div class="col-12">
