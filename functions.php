@@ -1061,7 +1061,7 @@ function getAdSettings() {
         'mode' => $mode,
         'paragraph_interval' => getSettingInt('ads_paragraph_interval', 4, 2, 10),
         'max_units' => getSettingInt('ads_max_units_per_article', 2, 1, 6),
-        'min_words_before_first' => getSettingInt('ads_min_words_before_first_injection', 180, 80, 600),
+        'min_words_before_first' => getSettingInt('ads_min_words_before_first_injection', 260, 120, 900),
         'min_article_words' => getSettingInt('ads_min_article_words', 420, 120, 3000),
         'blocked_title_keywords' => trim((string)getSetting('ads_blocked_title_keywords', '')),
         'blocked_categories' => trim((string)getSetting('ads_blocked_categories', '')),
@@ -2268,6 +2268,45 @@ function getStaticPages($language = null) {
         $language = detectPreferredLanguage();
     }
     $isArabic = $language === 'ar';
+    $nicheServicesContent = [];
+    $niches = listNiches();
+    foreach ($niches as $niche) {
+        $nicheName = trim((string)($niche['name'] ?? ''));
+        $nicheSlug = trim((string)($niche['slug'] ?? ''));
+        $nicheDesc = trim((string)($niche['description'] ?? ''));
+        if ($nicheName === '') {
+            continue;
+        }
+
+        $rssSources = $nicheSlug !== '' ? getNicheRssSources($nicheSlug) : [];
+        $webSources = $nicheSlug !== '' ? getNicheWebSources($nicheSlug) : [];
+        $rssCount = count($rssSources);
+        $webCount = count($webSources);
+        $sampleRss = $rssCount > 0 ? (string)$rssSources[0] : '';
+        $sampleWeb = $webCount > 0 ? (string)$webSources[0] : '';
+        $nicheTitle = $nicheName . ($nicheSlug !== '' ? ' (' . $nicheSlug . ')' : '');
+
+        if ($isArabic) {
+            $nicheServicesContent[] = 'نيش "' . $nicheTitle . '": نوفّر له إطار عمل متكامل للنمو يشمل التخطيط التحريري، تحسين الظهور في البحث، وقياس النتائج.';
+            $nicheServicesContent[] = 'الوصف: ' . ($nicheDesc !== '' ? $nicheDesc : 'لا يوجد وصف حاليًا، ويمكننا صياغة وصف احترافي موجّه بدقة للجمهور المستهدف.');
+            $nicheServicesContent[] = 'الجاهزية الحالية للمصادر: RSS=' . $rssCount . ' | Web=' . $webCount . '.';
+            $nicheServicesContent[] = $sampleRss !== '' ? 'أقوى مصدر RSS مقترح: ' . $sampleRss : 'لا يوجد مصدر RSS مضاف حاليًا.';
+            $nicheServicesContent[] = $sampleWeb !== '' ? 'أقوى مصدر Web مقترح: ' . $sampleWeb : 'لا يوجد مصدر Web مضاف حاليًا.';
+            $nicheServicesContent[] = 'خطة AF (Attract & Follow-up): جذب الزوار عبر مواضيع دقيقة، ثم متابعة الأداء أسبوعيًا لتطوير خطة المحتوى وتحسين التحويل.';
+        } else {
+            $nicheServicesContent[] = 'Niche "' . $nicheTitle . '": we provide a complete growth framework across editorial planning, search visibility optimization, and measurable performance tracking.';
+            $nicheServicesContent[] = 'Description: ' . ($nicheDesc !== '' ? $nicheDesc : 'No description is configured yet; we can craft a focused, audience-specific positioning summary.');
+            $nicheServicesContent[] = 'Current source readiness: RSS=' . $rssCount . ' | Web=' . $webCount . '.';
+            $nicheServicesContent[] = $sampleRss !== '' ? 'Top suggested RSS source: ' . $sampleRss : 'No RSS source is currently configured.';
+            $nicheServicesContent[] = $sampleWeb !== '' ? 'Top suggested Web source: ' . $sampleWeb : 'No Web source is currently configured.';
+            $nicheServicesContent[] = 'AF plan (Attract & Follow-up): attract qualified traffic through precise topic clusters, then run weekly follow-up optimization to improve reach and conversion.';
+        }
+    }
+    if (empty($nicheServicesContent)) {
+        $nicheServicesContent = $isArabic
+            ? ['نقدّم خدمات مرنة قابلة للتخصيص حسب النيش المستهدف مع متابعة وتحسين مستمر.']
+            : ['We offer flexible, niche-specific services with continuous follow-up and optimization.'];
+    }
     return [
         'about' => [
             'title' => $isArabic ? 'من نحن' : 'About Us',
@@ -2302,6 +2341,36 @@ function getStaticPages($language = null) {
                     'For ad and business inquiries, please email: partnerships@example.com',
                     'We review all messages and aim to reply within 2 business days.',
                 ],
+        ],
+        'services' => [
+            'title' => $isArabic ? 'خدماتنا' : 'Our Services',
+            'description' => $isArabic
+                ? 'نقدم حزمة خدمات سيارات متكاملة تشمل الاستشارات قبل الشراء، تحليل التكلفة، وخطط الصيانة الذكية.'
+                : 'Explore our end-to-end automotive services, from pre-purchase consulting to maintenance planning and ownership optimization.',
+            'content' => array_merge(
+                $isArabic
+                ? [
+                    'نقدّم خدمة استشارات قبل الشراء لمساعدتك على اختيار السيارة المناسبة بناءً على نمط الاستخدام اليومي، ميزانية الوقود أو الشحن، وتكاليف الملكية المتوقعة خلال 3 إلى 5 سنوات.',
+                    'فريقنا يجهّز مقارنة تفصيلية بين الفئات المختلفة لنفس الموديل، مع توضيح الفرق الحقيقي في التجهيزات، أنظمة الأمان، القيمة مقابل السعر، وإعادة البيع المتوقعة في سوق المستعمل.',
+                    'نوفر خدمة مراجعة حالة السيارة المستعملة قبل الشراء عبر قائمة فحص عملية تشمل السجل الفني، حالة الهيكل، أداء المحرك أو البطارية، وتكاليف الإصلاح المحتملة بعد الاستلام.',
+                    'نساعدك في بناء خطة صيانة دورية ذكية مرتبطة بعدد الكيلومترات وطبيعة القيادة داخل المدينة أو على الطرق السريعة، لتقليل الأعطال المفاجئة وتحسين عمر السيارة.',
+                    'نقدم تحليلات تكلفة تشغيل شهرية تتضمن الوقود أو الكهرباء، التأمين، الإهلاك، رسوم الترخيص، وتوقعات الصيانة، بحيث تحصل على صورة مالية واضحة قبل أي قرار.',
+                    'للشركات وأصحاب الأساطيل الصغيرة، نوفر خدمة تحسين إدارة الأسطول عبر تقارير أداء المركبات، توزيع الاستخدام، وتحديد فرص خفض التكلفة ورفع الكفاءة التشغيلية.',
+                    'نوفر خدمة تخطيط الرحلات الطويلة للسيارات الكهربائية والبنزين مع توصيات عملية لنقاط التوقف، إدارة الاستهلاك، وتجهيزات السلامة الضرورية قبل السفر.',
+                    'نشاركك أدلة مبسطة للعناية بالسيارة بعد الشراء، مثل حماية الطلاء، متابعة ضغط الإطارات، تحسين استهلاك الطاقة، والحفاظ على القيمة السوقية للسيارة مع الوقت.',
+                ]
+                : [
+                    'Our pre-purchase advisory service helps you choose the right vehicle using daily driving patterns, fuel or charging realities, and projected 3–5 year ownership costs.',
+                    'We provide detailed trim-level comparisons to highlight meaningful differences in safety features, technology, comfort, resale potential, and true value for money.',
+                    'For used vehicles, we offer a practical inspection framework covering service history, body condition, engine or battery health, and likely near-term repair risks.',
+                    'We design mileage-based maintenance roadmaps tailored to city and highway usage so you can reduce unexpected failures and extend long-term vehicle reliability.',
+                    'Our ownership cost analysis includes fuel or electricity, insurance, depreciation, licensing fees, and forecast maintenance to give you a complete financial view.',
+                    'For small fleets and business operators, we provide optimization guidance through usage analytics, vehicle allocation insights, and cost-efficiency opportunities.',
+                    'We support long-distance trip planning for EV and ICE vehicles with practical stop strategy recommendations, range management tips, and safety preparation checklists.',
+                    'You also get easy-to-follow post-purchase care guidance covering tire pressure habits, paint protection basics, efficiency practices, and resale value preservation.',
+                ],
+                $nicheServicesContent
+            ),
         ],
         'privacy' => [
             'title' => $isArabic ? 'سياسة الخصوصية' : 'Privacy Policy',

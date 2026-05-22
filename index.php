@@ -18,9 +18,8 @@ $baseUrl = getSiteBaseUrl();
 $siteTitle = getSiteTitle();
 $pageTitle = (string)getSetting('seo_home_title', $siteTitle);
 $pageDescription = (string)getSetting('seo_home_description', 'Automotive reviews, guides, and practical car ownership tips.');
-$canonicalUrl = $baseUrl . '/index.php';
-// always include language in canonical links
-$canonicalUrl .= (strpos($canonicalUrl, '?') === false ? '?' : '&') . 'lang=' . urlencode($language);
+$canonicalBaseUrl = $baseUrl . '/index.php';
+$canonicalUrl = $canonicalBaseUrl . (strpos($canonicalBaseUrl, '?') === false ? '?' : '&') . 'lang=' . urlencode($language);
 $openGraphType = 'website';
 $openGraphImage = null;
 $articleStructuredData = null;
@@ -115,7 +114,8 @@ if ($isFilteredListing) {
 if ($staticPage !== '') {
     $pageTitle = $staticPages[$staticPage]['title'] . ' | ' . $siteTitle;
     $pageDescription = $staticPages[$staticPage]['description'];
-    $canonicalUrl = $baseUrl . '/index.php?doc=' . rawurlencode($staticPage) . '&lang=' . urlencode($language);
+    $canonicalBaseUrl = $baseUrl . '/index.php?doc=' . rawurlencode($staticPage);
+    $canonicalUrl = $canonicalBaseUrl . '&lang=' . urlencode($language);
     $openGraphType = 'website';
     if ($defaultSocialImage !== '') {
         $openGraphImage = $defaultSocialImage;
@@ -136,7 +136,8 @@ if ($slug !== '') {
             $pageDescription = mb_substr(trim(strip_tags((string)($seoArticle['content'] ?? ''))), 0, 160);
         }
         $pageDescription = mb_substr($pageDescription, 0, 160);
-        $canonicalUrl = $baseUrl . '/index.php?slug=' . rawurlencode((string)$seoArticle['slug']) . '&lang=' . urlencode($language);
+        $canonicalBaseUrl = $baseUrl . '/index.php?slug=' . rawurlencode((string)$seoArticle['slug']);
+        $canonicalUrl = $canonicalBaseUrl . '&lang=' . urlencode($language);
         $openGraphType = 'article';
 
         $openGraphImages = [];
@@ -266,9 +267,9 @@ if ($slug === '' && $staticPage === '') {
         <meta name="msvalidate.01" content="<?= e($bingSiteVerification) ?>">
     <?php endif; ?>
     <link rel="canonical" href="<?= e($canonicalUrl) ?>">
-    <link rel="alternate" hreflang="en" href="<?= e($canonicalUrl . (str_contains($canonicalUrl, '?') ? '&' : '?') . 'lang=en') ?>">
-    <link rel="alternate" hreflang="ar" href="<?= e($canonicalUrl . (str_contains($canonicalUrl, '?') ? '&' : '?') . 'lang=ar') ?>">
-    <link rel="alternate" hreflang="x-default" href="<?= e($canonicalUrl . (str_contains($canonicalUrl, '?') ? '&' : '?') . 'lang=en') ?>">
+    <link rel="alternate" hreflang="en" href="<?= e($canonicalBaseUrl . (str_contains($canonicalBaseUrl, '?') ? '&' : '?') . 'lang=en') ?>">
+    <link rel="alternate" hreflang="ar" href="<?= e($canonicalBaseUrl . (str_contains($canonicalBaseUrl, '?') ? '&' : '?') . 'lang=ar') ?>">
+    <link rel="alternate" hreflang="x-default" href="<?= e($canonicalBaseUrl . (str_contains($canonicalBaseUrl, '?') ? '&' : '?') . 'lang=en') ?>">
     <meta property="og:title" content="<?= e($pageTitle) ?>">
     <meta property="og:description" content="<?= e($pageDescription) ?>">
     <meta property="og:type" content="<?= e($openGraphType) ?>">
@@ -311,62 +312,6 @@ if ($slug === '' && $staticPage === '') {
     <?php endif; ?>
     <?php if ($listingStructuredData): ?>
         <script type="application/ld+json"><?= json_encode($listingStructuredData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?></script>
-    <?php endif; ?>
-    <?php if ($googleAnalyticsId !== '' || $googleTagManagerId !== '' || $metaPixelId !== ''): ?>
-        <script>
-            (function () {
-                var gaId = <?= json_encode($googleAnalyticsId, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
-                var gtmId = <?= json_encode($googleTagManagerId, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
-                var pixelId = <?= json_encode($metaPixelId, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
-
-                function loadScript(src) {
-                    var script = document.createElement('script');
-                    script.async = true;
-                    script.src = src;
-                    document.head.appendChild(script);
-                }
-
-                function loadTrackingScripts() {
-                    if (gaId) {
-                        window.dataLayer = window.dataLayer || [];
-                        window.gtag = window.gtag || function(){ window.dataLayer.push(arguments); };
-                        window.gtag('js', new Date());
-                        window.gtag('config', gaId);
-                        loadScript('https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(gaId));
-                    }
-
-                    if (gtmId) {
-                        window.dataLayer = window.dataLayer || [];
-                        window.dataLayer.push({'gtm.start': new Date().getTime(), event: 'gtm.js'});
-                        loadScript('https://www.googletagmanager.com/gtm.js?id=' + encodeURIComponent(gtmId));
-                    }
-
-                    if (pixelId) {
-                        !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-                        n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
-                        n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
-                        t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window, document,'script',
-                        'https://connect.facebook.net/en_US/fbevents.js');
-                        fbq('init', pixelId);
-                        fbq('track', 'PageView');
-                    }
-                }
-
-                function deferTracking() {
-                    if ('requestIdleCallback' in window) {
-                        requestIdleCallback(loadTrackingScripts, { timeout: 2500 });
-                    } else {
-                        setTimeout(loadTrackingScripts, 1200);
-                    }
-                }
-
-                if (document.readyState === 'complete') {
-                    deferTracking();
-                } else {
-                    window.addEventListener('load', deferTracking, { once: true });
-                }
-            })();
-        </script>
     <?php endif; ?>
     <?php if ($customHeadScripts !== ''): ?>
         <?= renderCustomScripts($customHeadScripts) ?>
@@ -1427,6 +1372,62 @@ $baseQuery['per_page'] = $perPage;
 </footer>
 </div>
 </main>
+<?php if ($googleAnalyticsId !== '' || $googleTagManagerId !== '' || $metaPixelId !== ''): ?>
+    <script>
+        (function () {
+            var gaId = <?= json_encode($googleAnalyticsId, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+            var gtmId = <?= json_encode($googleTagManagerId, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+            var pixelId = <?= json_encode($metaPixelId, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+
+            function loadScript(src) {
+                var script = document.createElement('script');
+                script.async = true;
+                script.src = src;
+                document.head.appendChild(script);
+            }
+
+            function loadTrackingScripts() {
+                if (gaId) {
+                    window.dataLayer = window.dataLayer || [];
+                    window.gtag = window.gtag || function(){ window.dataLayer.push(arguments); };
+                    window.gtag('js', new Date());
+                    window.gtag('config', gaId);
+                    loadScript('https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(gaId));
+                }
+
+                if (gtmId) {
+                    window.dataLayer = window.dataLayer || [];
+                    window.dataLayer.push({'gtm.start': new Date().getTime(), event: 'gtm.js'});
+                    loadScript('https://www.googletagmanager.com/gtm.js?id=' + encodeURIComponent(gtmId));
+                }
+
+                if (pixelId) {
+                    !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+                    n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
+                    n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
+                    t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window, document,'script',
+                    'https://connect.facebook.net/en_US/fbevents.js');
+                    fbq('init', pixelId);
+                    fbq('track', 'PageView');
+                }
+            }
+
+            function deferTracking() {
+                if ('requestIdleCallback' in window) {
+                    requestIdleCallback(loadTrackingScripts, { timeout: 2500 });
+                } else {
+                    setTimeout(loadTrackingScripts, 1200);
+                }
+            }
+
+            if (document.readyState === 'complete') {
+                deferTracking();
+            } else {
+                window.addEventListener('load', deferTracking, { once: true });
+            }
+        })();
+    </script>
+<?php endif; ?>
 <?php if ($googleTagManagerId !== ''): ?>
     <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=<?= e($googleTagManagerId) ?>" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
 <?php endif; ?>
